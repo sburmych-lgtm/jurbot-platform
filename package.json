@@ -1,0 +1,24 @@
+{
+  "name": "jurbot",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev -w apps/backend",
+    "dev:frontend": "npm run dev -w apps/web",
+    "build": "npm run build -w packages/shared && npm run build -w packages/db && npm run build -w apps/backend && npm run build -w apps/web",
+    "test": "vitest run",
+    "typecheck": "tsc -b packages/shared packages/db apps/backend && npm run typecheck -w apps/web",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.2",
+    "vitest": "^3.1.1",
+    "eslint": "^9.22.0",
+    "prettier": "^3.5.3",
+    "@types/node": "^22.13.10"
+  }
+}

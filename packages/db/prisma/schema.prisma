@@ -1,0 +1,360 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Enums ---
+
+enum Role {
+  LAWYER
+  CLIENT
+}
+
+enum CaseStatus {
+  INTAKE        // accepted from intake form
+  ANALYSIS      // lawyer reviewing
+  PREPARATION   // documents being prepared
+  FILED         // submitted to court
+  AWAITING      // awaiting court decision
+  COMPLETED     // case closed
+}
+
+enum CaseCategory {
+  FAMILY
+  CIVIL
+  COMMERCIAL
+  CRIMINAL
+  MIGRATION
+  REALESTATE
+  LABOR
+  OTHER
+}
+
+enum Urgency {
+  URGENT   // 24 hours
+  WEEK     // within a week
+  NORMAL   // not urgent
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum AppointmentType {
+  FREE         // 30 min, free
+  CONSULT      // 60 min, 1500 UAH
+  ANALYSIS     // 90 min, 2500 UAH
+}
+
+enum DocumentStatus {
+  DRAFT
+  PENDING_SIGNATURE   // "Na pidpysi"
+  READY               // "Hotovyi"
+  ARCHIVED
+}
+
+enum NotificationType {
+  CASE_UPDATE
+  APPOINTMENT_REMINDER
+  DOCUMENT_READY
+  MESSAGE
+  SYSTEM
+}
+
+// --- Core Entities ---
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String   // bcrypt hash
+  role      Role
+  name      String
+  phone     String?
+  city      String?
+  avatarUrl String?
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  lawyerProfile    LawyerProfile?
+  clientProfile    ClientProfile?
+  notifications    Notification[]
+  telegramIdentity TelegramIdentity?
+  uploads          Upload[]
+
+  // Chat relations
+  sentMessages     Message[] @relation("sender")
+
+  @@index([email])
+  @@index([role])
+}
+
+model LawyerProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenseNo   String?  // svidotstvo advokata
+  specialties CaseCategory[]
+  bio         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  cases        Case[]
+  appointments Appointment[]
+  timeLogs     TimeLog[]
+
+  @@index([userId])
+}
+
+model ClientProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessCode  String   @unique // 6-digit portal access code
+  taxId       String?  // IPN
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  cases        Case[]
+  appointments Appointment[]
+  intakeForm   IntakeSubmission?
+
+  @@index([userId])
+  @@index([accessCode])
+}
+
+model IntakeSubmission {
+  id          String       @id @default(uuid())
+  clientId    String       @unique
+  client      ClientProfile @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category    CaseCategory
+  urgency     Urgency
+  description String
+  city        String?
+  fileName    String?       // original upload filename
+
+  // Lead scoring (computed)
+  leadScore   String?       // HOT / WARM / COLD
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+}
+
+model Case {
+  id          String       @id @default(uuid())
+  caseNumber  String       @unique // CS-2026-XXXX
+  title       String       // "Rozluchennia ta rozdil maina"
+  category    CaseCategory
+  status      CaseStatus   @default(INTAKE)
+  urgency     Urgency      @default(NORMAL)
+  description String?
+
+  // Court info
+  courtName   String?
+  courtDate   DateTime?
+  courtRoom   String?
+
+  // Next action
+  nextAction  String?
+  nextDate    DateTime?
+
+  // Relations
+  lawyerId    String
+  lawyer      LawyerProfile @relation(fields: [lawyerId], references: [id], onDelete: Restrict)
+  clientId    String
+  client      ClientProfile @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  documents   Document[]
+  appointments Appointment[]
+  timeLogs    TimeLog[]
+  messages    Message[]
+  checklist   ChecklistItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([caseNumber])
+  @@index([lawyerId])
+  @@index([clientId])
+  @@index([status])
+}
+
+model Document {
+  id       String         @id @default(uuid())
+  name     String         // "Pozovna zaiava.pdf"
+  status   DocumentStatus @default(DRAFT)
+  type     String?        // template ID: pozov, vidzyv, dogovir, etc.
+  content  String?        // generated document text content
+  size     String?        // "245 KB"
+
+  // Relations
+  caseId   String
+  case     Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  uploadId String?  @unique
+  upload   Upload?  @relation(fields: [uploadId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([caseId])
+  @@index([status])
+}
+
+model Upload {
+  id           String  @id @default(uuid())
+  originalName String  // original filename
+  storagePath  String  // path on disk or S3 key
+  mimeType     String
+  sizeBytes    Int
+  uploadedById String
+  uploadedBy   User    @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  document     Document?
+
+  createdAt DateTime @default(now())
+
+  @@index([uploadedById])
+}
+
+model Appointment {
+  id        String            @id @default(uuid())
+  refNumber String            @unique // BK-2026-XXXX
+  type      AppointmentType
+  status    AppointmentStatus @default(PENDING)
+  date      DateTime          // date + time combined
+  duration  Int               // in minutes: 30, 60, 90
+  price     Int               // in UAH kopecks: 0, 150000, 250000
+  notes     String?
+
+  // Relations
+  lawyerId  String
+  lawyer    LawyerProfile @relation(fields: [lawyerId], references: [id], onDelete: Restrict)
+  clientId  String
+  client    ClientProfile @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  caseId    String?
+  case      Case?         @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  reminders AppointmentReminder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([lawyerId])
+  @@index([clientId])
+  @@index([date])
+  @@index([status])
+}
+
+model AppointmentReminder {
+  id            String      @id @default(uuid())
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  timing        String      // "1d", "2h", "30m"
+  enabled       Boolean     @default(true)
+  sentAt        DateTime?   // null = not yet sent
+
+  createdAt DateTime @default(now())
+
+  @@unique([appointmentId, timing])
+}
+
+model TimeLog {
+  id          String        @id @default(uuid())
+  lawyerId    String
+  lawyer      LawyerProfile @relation(fields: [lawyerId], references: [id], onDelete: Cascade)
+  caseId      String
+  case        Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  description String
+  minutes     Int
+  date        DateTime      @default(now())
+  billable    Boolean       @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([lawyerId])
+  @@index([caseId])
+}
+
+model Message {
+  id       String  @id @default(uuid())
+  caseId   String
+  case     Case    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  senderId String
+  sender   User    @relation("sender", fields: [senderId], references: [id], onDelete: Cascade)
+  text     String
+  isRead   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([caseId])
+  @@index([senderId])
+}
+
+model ChecklistItem {
+  id      String  @id @default(uuid())
+  caseId  String
+  case    Case    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  text    String
+  done    Boolean @default(false)
+  order   Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([caseId])
+}
+
+model Notification {
+  id      String           @id @default(uuid())
+  userId  String
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type    NotificationType
+  title   String
+  body    String
+  isRead  Boolean          @default(false)
+  link    String?          // deep link within app
+
+  // Telegram delivery
+  telegramSent Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+model TelegramIdentity {
+  id             String  @id @default(uuid())
+  userId         String  @unique
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  telegramId     BigInt  @unique // Telegram numeric user ID
+  telegramUsername String?
+  chatId         BigInt  // for sending messages
+  botType        String  // "lawyer" | "client"
+  isVerified     Boolean @default(false)
+
+  linkedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([telegramId])
+  @@index([userId])
+}

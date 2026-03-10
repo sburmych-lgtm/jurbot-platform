@@ -1,0 +1,37 @@
+{
+  "name": "@jurbot/backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@jurbot/shared": "*",
+    "@jurbot/db": "*",
+    "@jurbot/telegram": "*",
+    "express": "^5.1.0",
+    "cors": "^2.8.5",
+    "helmet": "^8.1.0",
+    "express-rate-limit": "^7.5.0",
+    "jsonwebtoken": "^9.0.2",
+    "bcrypt": "^5.1.1",
+    "multer": "^1.4.5-lts.2",
+    "cookie-parser": "^1.4.7",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.2",
+    "@types/cors": "^2.8.17",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/bcrypt": "^5.0.2",
+    "@types/multer": "^1.4.12",
+    "@types/cookie-parser": "^1.4.8",
+    "tsx": "^4.19.3",
+    "supertest": "^7.1.0",
+    "@types/supertest": "^6.0.2"
+  }
+}
