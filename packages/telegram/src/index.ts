@@ -1,1 +1,1 @@
-export { createLawyerBot, createClientBot } from './config';
+export { createLawyerBot, createClientBot, isPlaceholderToken } from './config.js';

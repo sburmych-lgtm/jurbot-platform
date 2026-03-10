@@ -1,4 +1,4 @@
-import type { CaseCategory, Urgency } from '../enums';
+import type { CaseCategory, Urgency } from '../enums.js';
 
 export function getLeadScore(category: CaseCategory, urgency: Urgency, hasDescription: boolean): 'HOT' | 'WARM' | 'COLD' {
   let score = 0;

@@ -10,3 +10,10 @@ dist/
 coverage/
 *.tsbuildinfo
 uploads/
+
+# TS build artifacts in src dirs (from composite builds)
+**/*.js.map
+**/src/**/*.js
+**/src/**/*.d.ts
+**/src/**/*.d.ts.map
+!apps/web/src/vite-env.d.ts
