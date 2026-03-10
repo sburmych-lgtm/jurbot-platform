@@ -12,11 +12,16 @@
     "studio": "prisma studio",
     "build": "tsc"
   },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "dependencies": {
     "@prisma/client": "^6.5.0"
   },
   "devDependencies": {
     "prisma": "^6.5.0",
-    "tsx": "^4.19.3"
+    "tsx": "^4.19.3",
+    "bcrypt": "^5.1.1",
+    "@types/bcrypt": "^5.0.2"
   }
 }

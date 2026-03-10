@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { config } from './config.js';
 import { errorHandler } from './middleware/errorHandler.js';
-import { healthRouter } from './routes/health.routes.js';
+import { apiRouter } from './routes/index.js';
 
 const app = express();
 
@@ -13,7 +13,7 @@ app.use(cors({ origin: config.frontendUrl, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
-app.use('/api', healthRouter);
+app.use('/api', apiRouter);
 
 app.use(errorHandler);
 
