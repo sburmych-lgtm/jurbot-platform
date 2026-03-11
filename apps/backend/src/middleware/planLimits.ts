@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { checkLimit, checkTrialExpiry } from '../services/subscription.service.js';
+import { checkLimit, checkTrialExpiry, isSuperadminUser } from '../services/subscription.service.js';
 import { prisma } from '@jurbot/db';
 import { AppError } from './errorHandler.js';
 
@@ -23,10 +23,14 @@ async function resolveOrgId(userId: string): Promise<string | null> {
 
 /**
  * Middleware factory: check subscription is active before allowing action.
+ * Superadmin bypasses all subscription checks.
  */
 export function requireActiveSubscription() {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     if (!req.user) throw new AppError(401, 'Авторизація необхідна');
+
+    // Superadmin bypasses all subscription checks
+    if (await isSuperadminUser(req.user.id)) return next();
 
     const orgId = await resolveOrgId(req.user.id);
     if (!orgId) throw new AppError(403, 'Організація не знайдена');
@@ -42,10 +46,14 @@ export function requireActiveSubscription() {
 
 /**
  * Middleware factory: check a specific limit before allowing create action.
+ * Superadmin bypasses all limits.
  */
 export function requireLimit(limitType: 'clients' | 'cases' | 'aiDocs') {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     if (!req.user) throw new AppError(401, 'Авторизація необхідна');
+
+    // Superadmin bypasses all limits
+    if (await isSuperadminUser(req.user.id)) return next();
 
     const orgId = await resolveOrgId(req.user.id);
     if (!orgId) throw new AppError(403, 'Організація не знайдена');

@@ -10,6 +10,7 @@ export interface UserPayload {
   email: string;
   role: string;
   name: string;
+  isSuperadmin?: boolean;
 }
 
 export interface TokenPair {

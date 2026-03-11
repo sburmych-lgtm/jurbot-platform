@@ -7,16 +7,25 @@ let clientBot: Bot | null = null;
 
 export function initBots(): { lawyerBot: Bot | null; clientBot: Bot | null } {
   const miniAppUrl = config.miniAppUrl || undefined;
+  const superadminTelegramId = config.superadminTelegramId;
 
   if (!isPlaceholderToken(config.telegramLawyerToken)) {
-    lawyerBot = createLawyerBot(config.telegramLawyerToken, miniAppUrl);
+    lawyerBot = createLawyerBot({
+      token: config.telegramLawyerToken,
+      miniAppUrl,
+      superadminTelegramId,
+    });
     console.log('[Telegram] Lawyer bot initialized');
   } else {
     console.warn('[Telegram] Lawyer bot token is placeholder — skipping init');
   }
 
   if (!isPlaceholderToken(config.telegramClientToken)) {
-    clientBot = createClientBot(config.telegramClientToken, miniAppUrl);
+    clientBot = createClientBot({
+      token: config.telegramClientToken,
+      miniAppUrl,
+      superadminTelegramId,
+    });
     console.log('[Telegram] Client bot initialized');
   } else {
     console.warn('[Telegram] Client bot token is placeholder — skipping init');

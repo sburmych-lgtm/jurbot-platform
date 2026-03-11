@@ -1,7 +1,25 @@
 import { prisma } from '@jurbot/db';
 import type { SubscriptionPlan } from '@prisma/client';
+import { config } from '../config.js';
 
 const TRIAL_DAYS = 14;
+
+/**
+ * Check if a user is the superadmin by telegramId.
+ * Superadmin bypasses all plan limits and trial restrictions.
+ */
+export function isSuperadminTelegramId(telegramId: bigint): boolean {
+  return config.superadminTelegramId !== null && telegramId === config.superadminTelegramId;
+}
+
+/**
+ * Check if a userId belongs to the superadmin.
+ */
+export async function isSuperadminUser(userId: string): Promise<boolean> {
+  if (!config.superadminTelegramId) return false;
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { telegramId: true } });
+  return user?.telegramId === config.superadminTelegramId;
+}
 
 interface PlanLimits {
   maxClients: number | null; // null = unlimited

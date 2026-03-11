@@ -66,8 +66,16 @@ function validateInitData(initDataStr: string, botToken: string): TelegramInitDa
 }
 
 /**
+ * Check if a telegramId is the configured superadmin.
+ */
+function isSuperadmin(telegramId: bigint): boolean {
+  return config.superadminTelegramId !== null && telegramId === config.superadminTelegramId;
+}
+
+/**
  * Middleware: validate Telegram initData from X-Telegram-Init-Data header.
  * Finds user by telegramId and attaches to req.user.
+ * Superadmin gets elevated access with isSuperadmin flag.
  */
 export async function telegramAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
   const initDataStr = req.headers['x-telegram-init-data'] as string | undefined;
@@ -88,6 +96,7 @@ export async function telegramAuth(req: Request, _res: Response, next: NextFunct
   }
 
   const telegramId = BigInt(parsed.user.id);
+  const superadmin = isSuperadmin(telegramId);
 
   // Find user by top-level telegramId field (fast lookup)
   let user = await prisma.user.findUnique({
@@ -115,6 +124,7 @@ export async function telegramAuth(req: Request, _res: Response, next: NextFunct
     email: user.email ?? '',
     role: user.role,
     name: user.name,
+    isSuperadmin: superadmin,
   };
 
   next();
