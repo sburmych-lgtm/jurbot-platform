@@ -16,6 +16,7 @@ import { SchedulePage } from '@/pages/lawyer/SchedulePage';
 import { LawyerDocumentsPage } from '@/pages/lawyer/DocumentsPage';
 import { TimeLogsPage } from '@/pages/lawyer/TimeLogsPage';
 import { ClientsPage } from '@/pages/lawyer/ClientsPage';
+import { SettingsPage } from '@/pages/lawyer/SettingsPage';
 
 // Client pages
 import { ClientDashboardPage } from '@/pages/client/DashboardPage';
@@ -63,6 +64,7 @@ export function App() {
         <Route path="timelogs" element={<TimeLogsPage />} />
         <Route path="clients" element={<ClientsPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="settings" element={<SettingsPage />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 
