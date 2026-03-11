@@ -133,6 +133,7 @@ export async function convertToCase(submissionId: string, lawyerUserId: string) 
       description: submission.description,
       lawyerId: lawyerProfile.id,
       clientId: submission.clientId,
+      orgId: lawyerProfile.orgId ?? undefined,
     },
     include: {
       client: { include: { user: { select: { id: true, name: true, email: true } } } },

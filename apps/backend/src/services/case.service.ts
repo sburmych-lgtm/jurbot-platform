@@ -76,6 +76,7 @@ export async function create(input: CreateCaseInput, lawyerUserId: string) {
       description: input.description,
       lawyerId: lawyerProfile.id,
       clientId: input.clientId,
+      orgId: lawyerProfile.orgId ?? undefined,
     },
     include: {
       client: { include: { user: { select: { id: true, name: true, email: true } } } },
