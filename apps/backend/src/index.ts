@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import path from 'path';
+import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { config } from './config.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -27,14 +28,22 @@ initBots();
 
 app.use('/api', apiRouter);
 
-// Serve Mini App static files in production
+// Serve Mini App static files in production (only if dist exists)
 if (config.nodeEnv === 'production') {
   const webDist = path.join(__dirname, '..', '..', 'web', 'dist');
-  app.use(express.static(webDist));
-  // SPA fallback: serve index.html for non-API routes
-  app.get('*', (_req, res) => {
-    res.sendFile(path.join(webDist, 'index.html'));
-  });
+  const indexHtml = path.join(webDist, 'index.html');
+
+  if (existsSync(indexHtml)) {
+    app.use(express.static(webDist));
+    // SPA fallback: serve index.html for non-API routes
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api')) return next();
+      res.sendFile(indexHtml);
+    });
+    console.log(`[Backend] Serving Mini App from ${webDist}`);
+  } else {
+    console.warn(`[Backend] Web dist not found at ${webDist} — skipping static serving`);
+  }
 }
 
 app.use(errorHandler);
