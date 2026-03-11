@@ -18,13 +18,13 @@ interface CaseItem {
 }
 
 const STATUSES = [
-  { value: '', label: '\u0412\u0441\u0456' },
-  { value: 'INTAKE', label: '\u041f\u0440\u0438\u0439\u043e\u043c' },
-  { value: 'ANALYSIS', label: '\u0410\u043d\u0430\u043b\u0456\u0437' },
-  { value: 'PREPARATION', label: '\u041f\u0456\u0434\u0433\u043e\u0442\u043e\u0432\u043a\u0430' },
-  { value: 'FILED', label: '\u041f\u043e\u0434\u0430\u043d\u043e' },
-  { value: 'AWAITING', label: '\u041e\u0447\u0456\u043a\u0443\u0432\u0430\u043d\u043d\u044f' },
-  { value: 'COMPLETED', label: '\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u043e' },
+  { value: '', label: 'Всі' },
+  { value: 'INTAKE', label: 'Прийом' },
+  { value: 'ANALYSIS', label: 'Аналіз' },
+  { value: 'PREPARATION', label: 'Підготовка' },
+  { value: 'FILED', label: 'Подано' },
+  { value: 'AWAITING', label: 'Очікування' },
+  { value: 'COMPLETED', label: 'Завершено' },
 ];
 
 export function CasesPage() {
@@ -56,7 +56,7 @@ export function CasesPage() {
     <PageContainer>
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-text-primary">\u0421\u043f\u0440\u0430\u0432\u0438</h1>
+          <h1 className="text-xl font-bold text-text-primary">Справи</h1>
         </div>
 
         {/* Search */}
@@ -65,7 +65,7 @@ export function CasesPage() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="\u041f\u043e\u0448\u0443\u043a..."
+            placeholder="Пошук..."
             className="w-full pl-10 pr-4 py-2.5 bg-bg-card border border-border-default rounded-[14px] text-sm text-text-primary placeholder-text-muted focus:border-accent-teal focus:outline-none"
           />
         </div>
@@ -89,7 +89,7 @@ export function CasesPage() {
 
         {/* List */}
         {filtered.length === 0 ? (
-          <EmptyState icon={Briefcase} title="\u0421\u043f\u0440\u0430\u0432 \u043d\u0435 \u0437\u043d\u0430\u0439\u0434\u0435\u043d\u043e" />
+          <EmptyState icon={Briefcase} title="Справ не знайдено" />
         ) : (
           <div className="space-y-3">
             {filtered.map(c => (

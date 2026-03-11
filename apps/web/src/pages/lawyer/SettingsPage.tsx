@@ -39,10 +39,10 @@ interface TokenItem {
 }
 
 const planLabels: Record<string, string> = {
-  TRIAL: 'Trial (14 \u0434\u043d\u0456\u0432)',
-  BASIC: 'Basic (499\u20b4/\u043c\u0456\u0441)',
-  PRO: 'Pro (1499\u20b4/\u043c\u0456\u0441)',
-  BUREAU: 'Bureau (3999\u20b4/\u043c\u0456\u0441)',
+  TRIAL: 'Trial (14 днів)',
+  BASIC: 'Basic (499₴/міс)',
+  PRO: 'Pro (1499₴/міс)',
+  BUREAU: 'Bureau (3999₴/міс)',
 };
 
 const statusColors: Record<string, 'green' | 'yellow' | 'red' | 'teal'> = {
@@ -77,7 +77,7 @@ export function SettingsPage() {
     const link = `https://t.me/YurBotClientBot?start=inv_${token}`;
     navigator.clipboard.writeText(link);
     setCopied(true);
-    showToast('\u041f\u043e\u0441\u0438\u043b\u0430\u043d\u043d\u044f \u0441\u043a\u043e\u043f\u0456\u0439\u043e\u0432\u0430\u043d\u043e');
+    showToast('Посилання скопійовано');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -85,7 +85,7 @@ export function SettingsPage() {
     try {
       const res = await api.post<TokenItem>('/v1/tokens', { tokenType: 'PUBLIC_LAWYER' });
       if (res.data) setTokens(prev => [res.data!, ...prev]);
-      showToast('\u0422\u043e\u043a\u0435\u043d \u0441\u0442\u0432\u043e\u0440\u0435\u043d\u043e');
+      showToast('Токен створено');
     } catch {}
   };
 
@@ -103,7 +103,7 @@ export function SettingsPage() {
   return (
     <PageContainer>
       <div className="space-y-5">
-        <h1 className="text-xl font-bold text-text-primary">\u041d\u0430\u043b\u0430\u0448\u0442\u0443\u0432\u0430\u043d\u043d\u044f</h1>
+        <h1 className="text-xl font-bold text-text-primary">Налаштування</h1>
 
         {/* Subscription */}
         <Card>
@@ -112,9 +112,9 @@ export function SettingsPage() {
               <CreditCard size={20} className="text-accent-blue" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-semibold text-text-primary">\u041f\u0456\u0434\u043f\u0438\u0441\u043a\u0430</p>
+              <p className="text-sm font-semibold text-text-primary">Підписка</p>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-xs text-text-muted">{planLabels[sub?.plan ?? ''] ?? sub?.plan ?? '\u041d\u0435\u043c\u0430\u0454'}</span>
+                <span className="text-xs text-text-muted">{planLabels[sub?.plan ?? ''] ?? sub?.plan ?? 'Немає'}</span>
                 {sub && <Badge color={statusColors[sub.status] ?? 'gray'}>{sub.status}</Badge>}
               </div>
             </div>
@@ -122,7 +122,7 @@ export function SettingsPage() {
 
           {sub?.expiresAt && (
             <p className="text-xs text-text-muted mb-3">
-              \u0414\u0456\u0454 \u0434\u043e: {new Date(sub.expiresAt).toLocaleDateString('uk-UA')}
+              Діє до: {new Date(sub.expiresAt).toLocaleDateString('uk-UA')}
             </p>
           )}
 
@@ -130,17 +130,17 @@ export function SettingsPage() {
             <div className="space-y-3">
               <ProgressBar
                 value={usagePercent(usage.clientsCount, limits.maxClients)}
-                label={`\u041a\u043b\u0456\u0454\u043d\u0442\u0438: ${usage.clientsCount}${limits.maxClients ? ` / ${limits.maxClients}` : ' (\u043d\u0435\u043e\u0431\u043c\u0435\u0436\u0435\u043d\u043e)'}`}
+                label={`Клієнти: ${usage.clientsCount}${limits.maxClients ? ` / ${limits.maxClients}` : ' (необмежено)'}`}
                 showPercent={limits.maxClients !== null}
               />
               <ProgressBar
                 value={usagePercent(usage.casesCount, limits.maxCases)}
-                label={`\u0421\u043f\u0440\u0430\u0432\u0438: ${usage.casesCount}${limits.maxCases ? ` / ${limits.maxCases}` : ' (\u043d\u0435\u043e\u0431\u043c\u0435\u0436\u0435\u043d\u043e)'}`}
+                label={`Справи: ${usage.casesCount}${limits.maxCases ? ` / ${limits.maxCases}` : ' (необмежено)'}`}
                 showPercent={limits.maxCases !== null}
               />
               <ProgressBar
                 value={usagePercent(usage.aiDocsCount, limits.maxAiDocs)}
-                label={`AI \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0438: ${usage.aiDocsCount}${limits.maxAiDocs ? ` / ${limits.maxAiDocs}` : ' (\u043d\u0435\u043e\u0431\u043c\u0435\u0436\u0435\u043d\u043e)'}`}
+                label={`AI документи: ${usage.aiDocsCount}${limits.maxAiDocs ? ` / ${limits.maxAiDocs}` : ' (необмежено)'}`}
                 showPercent={limits.maxAiDocs !== null}
               />
             </div>
@@ -154,20 +154,20 @@ export function SettingsPage() {
               <div className="w-10 h-10 rounded-[10px] bg-accent-teal/15 flex items-center justify-center">
                 <Link size={20} className="text-accent-teal" />
               </div>
-              <p className="text-sm font-semibold text-text-primary">\u0417\u0430\u043f\u0440\u043e\u0448\u0435\u043d\u043d\u044f</p>
+              <p className="text-sm font-semibold text-text-primary">Запрошення</p>
             </div>
-            <Button size="sm" onClick={createToken}>+ \u041d\u043e\u0432\u0435</Button>
+            <Button size="sm" onClick={createToken}>+ Нове</Button>
           </div>
 
           {tokens.length === 0 ? (
-            <p className="text-sm text-text-muted text-center py-4">\u041d\u0435\u043c\u0430\u0454 \u0430\u043a\u0442\u0438\u0432\u043d\u0438\u0445 \u0437\u0430\u043f\u0440\u043e\u0448\u0435\u043d\u044c</p>
+            <p className="text-sm text-text-muted text-center py-4">Немає активних запрошень</p>
           ) : (
             <div className="space-y-2">
               {tokens.filter(t => t.isActive).map(t => (
                 <div key={t.id} className="flex items-center justify-between bg-bg-tertiary rounded-[10px] px-3 py-2">
                   <div>
                     <p className="text-xs text-text-muted font-mono">inv_{t.token.slice(0, 8)}...</p>
-                    <p className="text-xs text-text-muted">{t.usageCount} \u0432\u0438\u043a\u043e\u0440\u0438\u0441\u0442\u0430\u043d\u044c</p>
+                    <p className="text-xs text-text-muted">{t.usageCount} використань</p>
                   </div>
                   <button
                     onClick={() => copyInviteLink(t.token)}

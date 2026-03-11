@@ -43,7 +43,7 @@ export function CaseDetailPage() {
   }, [id]);
 
   if (loading) return <Spinner />;
-  if (!data) return <div className="text-center py-8 text-text-muted">\u0421\u043f\u0440\u0430\u0432\u0443 \u043d\u0435 \u0437\u043d\u0430\u0439\u0434\u0435\u043d\u043e</div>;
+  if (!data) return <div className="text-center py-8 text-text-muted">Справу не знайдено</div>;
 
   return (
     <PageContainer>
@@ -64,19 +64,19 @@ export function CaseDetailPage() {
 
         <Card>
           <div className="space-y-3">
-            <SummaryRow label="\u041a\u043b\u0456\u0454\u043d\u0442" value={data.client?.user?.name} />
+            <SummaryRow label="Клієнт" value={data.client?.user?.name} />
             <SummaryRow label="Email" value={data.client?.user?.email} />
-            <SummaryRow label="\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0456\u044f" value={data.category} />
-            <SummaryRow label="\u0422\u0435\u0440\u043c\u0456\u043d\u043e\u0432\u0456\u0441\u0442\u044c" value={data.urgency} />
-            {data.courtName && <SummaryRow label="\u0421\u0443\u0434" value={data.courtName} />}
-            {data.courtDate && <SummaryRow label="\u0414\u0430\u0442\u0430 \u0441\u0443\u0434\u0443" value={new Date(data.courtDate).toLocaleDateString('uk-UA')} />}
-            <SummaryRow label="\u0421\u0442\u0432\u043e\u0440\u0435\u043d\u043e" value={new Date(data.createdAt).toLocaleDateString('uk-UA')} />
+            <SummaryRow label="Категорія" value={data.category} />
+            <SummaryRow label="Терміновість" value={data.urgency} />
+            {data.courtName && <SummaryRow label="Суд" value={data.courtName} />}
+            {data.courtDate && <SummaryRow label="Дата суду" value={new Date(data.courtDate).toLocaleDateString('uk-UA')} />}
+            <SummaryRow label="Створено" value={new Date(data.createdAt).toLocaleDateString('uk-UA')} />
           </div>
         </Card>
 
         {data.description && (
           <Card>
-            <h3 className="text-sm font-semibold text-text-secondary mb-2">\u041e\u043f\u0438\u0441</h3>
+            <h3 className="text-sm font-semibold text-text-secondary mb-2">Опис</h3>
             <p className="text-sm text-text-primary leading-relaxed">{data.description}</p>
           </Card>
         )}

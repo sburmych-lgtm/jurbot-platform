@@ -29,7 +29,7 @@ export function CaseProgress({ currentStatus }: CaseProgressProps) {
             </div>
             {current && (
               <span className="text-xs bg-accent-teal/15 text-accent-teal px-2 py-0.5 rounded-full font-medium">
-                \u041f\u043e\u0442\u043e\u0447\u043d\u0438\u0439
+                Поточний
               </span>
             )}
           </div>

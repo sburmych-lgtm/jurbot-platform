@@ -33,16 +33,16 @@ export function TimeLogsPage() {
   return (
     <PageContainer>
       <div className="space-y-4">
-        <h1 className="text-xl font-bold text-text-primary">\u0427\u0430\u0441</h1>
+        <h1 className="text-xl font-bold text-text-primary">Час</h1>
         {logs.length === 0 ? (
-          <EmptyState icon={Clock} title="\u0417\u0430\u043f\u0438\u0441\u0456\u0432 \u043d\u0435\u043c\u0430\u0454" />
+          <EmptyState icon={Clock} title="Записів немає" />
         ) : (
           <div className="space-y-3">
             {logs.map(l => (
               <Card key={l.id}>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-medium text-text-primary">{l.description}</span>
-                  <span className="text-sm font-bold text-accent-teal">{l.duration}\u0445\u0432</span>
+                  <span className="text-sm font-bold text-accent-teal">{l.duration}хв</span>
                 </div>
                 {l.case && <p className="text-xs text-text-muted">{l.case.title} ({l.case.caseNumber})</p>}
                 <p className="text-xs text-text-muted mt-1">{new Date(l.date).toLocaleDateString('uk-UA')}</p>

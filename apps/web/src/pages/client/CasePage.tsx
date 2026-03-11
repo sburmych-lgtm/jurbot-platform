@@ -24,9 +24,9 @@ interface CaseDetail {
 }
 
 const categoryLabels: Record<string, string> = {
-  FAMILY: '\u0421\u0456\u043c\u0435\u0439\u043d\u0435', CIVIL: '\u0426\u0438\u0432\u0456\u043b\u044c\u043d\u0435', COMMERCIAL: '\u0413\u043e\u0441\u043f\u043e\u0434\u0430\u0440\u0441\u044c\u043a\u0435',
-  CRIMINAL: '\u041a\u0440\u0438\u043c\u0456\u043d\u0430\u043b\u044c\u043d\u0435', MIGRATION: '\u041c\u0456\u0433\u0440\u0430\u0446\u0456\u0439\u043d\u0435', REALESTATE: '\u041d\u0435\u0440\u0443\u0445\u043e\u043c\u0456\u0441\u0442\u044c',
-  LABOR: '\u0422\u0440\u0443\u0434\u043e\u0432\u0435', OTHER: '\u0406\u043d\u0448\u0435',
+  FAMILY: 'Сімейне', CIVIL: 'Цивільне', COMMERCIAL: 'Господарське',
+  CRIMINAL: 'Кримінальне', MIGRATION: 'Міграційне', REALESTATE: 'Нерухомість',
+  LABOR: 'Трудове', OTHER: 'Інше',
 };
 
 export function ClientCasePage() {
@@ -45,7 +45,7 @@ export function ClientCasePage() {
   }, []);
 
   if (loading) return <Spinner />;
-  if (!caseData) return <EmptyState icon={Briefcase} title="\u0421\u043f\u0440\u0430\u0432\u0443 \u043d\u0435 \u0437\u043d\u0430\u0439\u0434\u0435\u043d\u043e" />;
+  if (!caseData) return <EmptyState icon={Briefcase} title="Справу не знайдено" />;
 
   return (
     <PageContainer>
@@ -70,17 +70,17 @@ export function ClientCasePage() {
 
         <Card>
           <div className="space-y-3">
-            <SummaryRow label="\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0456\u044f" value={categoryLabels[caseData.category] ?? caseData.category} />
-            <SummaryRow label="\u0410\u0434\u0432\u043e\u043a\u0430\u0442" value={caseData.lawyer?.user?.name} />
-            {caseData.courtName && <SummaryRow label="\u0421\u0443\u0434" value={caseData.courtName} />}
-            {caseData.courtDate && <SummaryRow label="\u0414\u0430\u0442\u0430 \u0441\u0443\u0434\u0443" value={new Date(caseData.courtDate).toLocaleDateString('uk-UA')} />}
-            <SummaryRow label="\u0421\u0442\u0432\u043e\u0440\u0435\u043d\u043e" value={new Date(caseData.createdAt).toLocaleDateString('uk-UA')} />
+            <SummaryRow label="Категорія" value={categoryLabels[caseData.category] ?? caseData.category} />
+            <SummaryRow label="Адвокат" value={caseData.lawyer?.user?.name} />
+            {caseData.courtName && <SummaryRow label="Суд" value={caseData.courtName} />}
+            {caseData.courtDate && <SummaryRow label="Дата суду" value={new Date(caseData.courtDate).toLocaleDateString('uk-UA')} />}
+            <SummaryRow label="Створено" value={new Date(caseData.createdAt).toLocaleDateString('uk-UA')} />
           </div>
         </Card>
 
         {caseData.description && (
           <Card>
-            <h3 className="text-sm font-semibold text-text-secondary mb-2">\u041e\u043f\u0438\u0441</h3>
+            <h3 className="text-sm font-semibold text-text-secondary mb-2">Опис</h3>
             <p className="text-sm text-text-primary leading-relaxed">{caseData.description}</p>
           </Card>
         )}

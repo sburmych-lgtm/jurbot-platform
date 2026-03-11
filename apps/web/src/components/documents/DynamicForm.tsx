@@ -13,14 +13,14 @@ export function DynamicForm({ template, values, onChange }: DynamicFormProps) {
 
   const groups = new Map<string, TemplateField[]>();
   for (const field of template.fields) {
-    const g = field.group ?? '\u0417\u0430\u0433\u0430\u043b\u044c\u043d\u0435';
+    const g = field.group ?? 'Загальне';
     if (!groups.has(g)) groups.set(g, []);
     groups.get(g)!.push(field);
   }
 
   return (
     <div className="space-y-5">
-      <ProgressBar value={progress} label={`${filledCount} \u0437 ${template.fields.length} \u043f\u043e\u043b\u0456\u0432`} />
+      <ProgressBar value={progress} label={`${filledCount} з ${template.fields.length} полів`} />
       {[...groups.entries()].map(([group, fields]) => (
         <div key={group}>
           <h3 className="text-xs font-bold text-text-muted uppercase tracking-wide mb-3">{group}</h3>
@@ -37,7 +37,7 @@ export function DynamicForm({ template, values, onChange }: DynamicFormProps) {
                     onChange={e => onChange(field.name, e.target.value)}
                     className="w-full px-3 py-2.5 bg-bg-tertiary border border-border-default rounded-[14px] text-sm text-text-primary focus:border-accent-teal focus:outline-none"
                   >
-                    <option value="">\u041e\u0431\u0435\u0440\u0456\u0442\u044c...</option>
+                    <option value="">Оберіть...</option>
                     {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                 ) : field.type === 'textarea' ? (

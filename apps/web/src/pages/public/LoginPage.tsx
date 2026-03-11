@@ -18,8 +18,8 @@ export function LoginPage() {
     return (
       <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center p-6">
         <Scale size={48} className="text-accent-teal mb-4" />
-        <h1 className="text-2xl font-bold text-text-primary font-display">\u042e\u0440\u0411\u043e\u0442</h1>
-        <p className="text-text-muted text-sm mt-2 text-center">\u0412\u0445\u0456\u0434 \u0447\u0435\u0440\u0435\u0437 Telegram \u0431\u043e\u0442\u0430</p>
+        <h1 className="text-2xl font-bold text-text-primary font-display">ЮрБот</h1>
+        <p className="text-text-muted text-sm mt-2 text-center">Вхід через Telegram бота</p>
       </div>
     );
   }
@@ -32,7 +32,7 @@ export function LoginPage() {
       await login(email, password);
       navigate('/');
     } catch (err: any) {
-      setError(err.message || '\u041f\u043e\u043c\u0438\u043b\u043a\u0430 \u0432\u0445\u043e\u0434\u0443');
+      setError(err.message || 'Помилка входу');
     }
     setLoading(false);
   };
@@ -42,15 +42,15 @@ export function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Scale size={48} className="mx-auto text-accent-teal mb-3" />
-          <h1 className="text-2xl font-bold text-text-primary font-display">\u042e\u0440\u0411\u043e\u0442</h1>
-          <p className="text-text-muted text-sm mt-1">\u0412\u0445\u0456\u0434 \u0432 \u0441\u0438\u0441\u0442\u0435\u043c\u0443</p>
+          <h1 className="text-2xl font-bold text-text-primary font-display">ЮрБот</h1>
+          <p className="text-text-muted text-sm mt-1">Вхід в систему</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <InputField label="Email" type="email" value={email} onChange={setEmail} placeholder="email@example.com" />
-          <InputField label="\u041f\u0430\u0440\u043e\u043b\u044c" type="password" value={password} onChange={setPassword} placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" />
+          <InputField label="Пароль" type="password" value={password} onChange={setPassword} placeholder="••••••••" />
           {error && <p className="text-accent-red text-sm text-center">{error}</p>}
-          <Button type="submit" size="lg" className="w-full" loading={loading}>\u0423\u0432\u0456\u0439\u0442\u0438</Button>
+          <Button type="submit" size="lg" className="w-full" loading={loading}>Увійти</Button>
         </form>
       </div>
     </div>

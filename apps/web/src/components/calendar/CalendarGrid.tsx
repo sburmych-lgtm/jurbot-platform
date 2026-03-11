@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { MONTHS_UK } from '@jurbot/shared';
 import { fmtDate } from '@/lib/utils';
 
-const DAYS = ['\u041f\u043d', '\u0412\u0442', '\u0421\u0440', '\u0427\u0442', '\u041f\u0442', '\u0421\u0431', '\u041d\u0434'];
+const DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
 interface CalendarGridProps {
   selected: string;

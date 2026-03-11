@@ -47,11 +47,11 @@ export function SchedulePage() {
   return (
     <PageContainer>
       <div className="space-y-4">
-        <h1 className="text-xl font-bold text-text-primary">\u0420\u043e\u0437\u043a\u043b\u0430\u0434</h1>
+        <h1 className="text-xl font-bold text-text-primary">Розклад</h1>
         <CalendarGrid selected={selectedDate} onSelect={setSelectedDate} />
 
         {dayAppts.length === 0 ? (
-          <EmptyState icon={Calendar} title="\u041d\u0435\u043c\u0430\u0454 \u0437\u0443\u0441\u0442\u0440\u0456\u0447\u0435\u0439" description="\u041d\u0430 \u0446\u0435\u0439 \u0434\u0435\u043d\u044c \u0437\u0443\u0441\u0442\u0440\u0456\u0447\u0456 \u043d\u0435 \u0437\u0430\u043f\u043b\u0430\u043d\u043e\u0432\u0430\u043d\u0456" />
+          <EmptyState icon={Calendar} title="Немає зустрічей" description="На цей день зустрічі не заплановані" />
         ) : (
           <div className="space-y-3">
             {dayAppts.map(a => (
@@ -62,10 +62,10 @@ export function SchedulePage() {
                   </span>
                   <Badge color={statusColors[a.status] ?? 'gray'}>{a.status}</Badge>
                 </div>
-                <p className="text-sm text-text-secondary">{a.client?.user?.name ?? '\u041a\u043b\u0456\u0454\u043d\u0442'}</p>
+                <p className="text-sm text-text-secondary">{a.client?.user?.name ?? 'Клієнт'}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <Badge color="blue">{a.type}</Badge>
-                  <span className="text-xs text-text-muted">{a.duration} \u0445\u0432</span>
+                  <span className="text-xs text-text-muted">{a.duration} хв</span>
                 </div>
               </Card>
             ))}

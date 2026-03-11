@@ -49,9 +49,9 @@ export function ChecklistPage() {
   return (
     <PageContainer>
       <div className="space-y-4">
-        <h1 className="text-xl font-bold text-text-primary">\u0427\u0435\u043a\u043b\u0456\u0441\u0442</h1>
+        <h1 className="text-xl font-bold text-text-primary">Чекліст</h1>
         {items.length === 0 ? (
-          <EmptyState icon={CheckSquare} title="\u041f\u0443\u043d\u043a\u0442\u0456\u0432 \u043d\u0435\u043c\u0430\u0454" description="\u0410\u0434\u0432\u043e\u043a\u0430\u0442 \u0434\u043e\u0434\u0430\u0441\u0442\u044c \u0437\u0430\u0432\u0434\u0430\u043d\u043d\u044f" />
+          <EmptyState icon={CheckSquare} title="Пунктів немає" description="Адвокат додасть завдання" />
         ) : (
           <div className="space-y-2">
             {items.map(item => (

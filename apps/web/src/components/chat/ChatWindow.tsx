@@ -49,7 +49,7 @@ export function ChatWindow({ messages, currentUserId, onSend, loading }: ChatWin
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
-          placeholder="\u041d\u0430\u043f\u0438\u0441\u0430\u0442\u0438 \u043f\u043e\u0432\u0456\u0434\u043e\u043c\u043b\u0435\u043d\u043d\u044f..."
+          placeholder="Написати повідомлення..."
           className="flex-1 px-4 py-3 rounded-[14px] border border-border-default bg-bg-tertiary text-text-primary focus:border-accent-teal focus:outline-none text-sm"
           onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
           disabled={loading}

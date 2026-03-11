@@ -48,7 +48,7 @@ export function MessagesPage() {
   };
 
   if (loading) return <Spinner />;
-  if (!caseId) return <EmptyState icon={MessageSquare} title="\u041d\u0435\u043c\u0430\u0454 \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0457 \u0441\u043f\u0440\u0430\u0432\u0438" />;
+  if (!caseId) return <EmptyState icon={MessageSquare} title="Немає активної справи" />;
 
   return (
     <PageContainer>

@@ -18,10 +18,10 @@ const statusColors: Record<string, 'green' | 'yellow' | 'orange' | 'gray'> = {
 };
 
 const statusLabels: Record<string, string> = {
-  DRAFT: '\u0427\u0435\u0440\u043d\u0435\u0442\u043a\u0430',
-  PENDING_SIGNATURE: '\u041d\u0430 \u043f\u0456\u0434\u043f\u0438\u0441\u0456',
-  READY: '\u0413\u043e\u0442\u043e\u0432\u0438\u0439',
-  ARCHIVED: '\u0410\u0440\u0445\u0456\u0432',
+  DRAFT: 'Чернетка',
+  PENDING_SIGNATURE: 'На підписі',
+  READY: 'Готовий',
+  ARCHIVED: 'Архів',
 };
 
 export function DocumentCard({ name, status, date, size, onDownload, onClick }: DocumentCardProps) {

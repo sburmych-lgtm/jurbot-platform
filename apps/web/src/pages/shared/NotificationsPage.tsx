@@ -42,9 +42,9 @@ export function NotificationsPage() {
   return (
     <PageContainer>
       <div className="space-y-4">
-        <h1 className="text-xl font-bold text-text-primary">\u0421\u043f\u043e\u0432\u0456\u0449\u0435\u043d\u043d\u044f</h1>
+        <h1 className="text-xl font-bold text-text-primary">Сповіщення</h1>
         {items.length === 0 ? (
-          <EmptyState icon={Bell} title="\u041d\u0435\u043c\u0430\u0454 \u0441\u043f\u043e\u0432\u0456\u0449\u0435\u043d\u044c" />
+          <EmptyState icon={Bell} title="Немає сповіщень" />
         ) : (
           <div className="space-y-3">
             {items.map(n => (

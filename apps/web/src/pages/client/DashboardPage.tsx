@@ -43,10 +43,10 @@ export function ClientDashboardPage() {
       <div className="space-y-5">
         {/* Hero */}
         <div className="bg-gradient-to-br from-bg-elevated to-bg-card rounded-[18px] border border-border-default p-5">
-          <p className="text-text-muted text-sm">\u0412\u0456\u0442\u0430\u044e,</p>
+          <p className="text-text-muted text-sm">Вітаю,</p>
           <h1 className="text-2xl font-bold text-text-primary font-display mt-1">{firstName}</h1>
           {caseData?.lawyer && (
-            <p className="text-text-secondary text-sm mt-2">\u0412\u0430\u0448 \u0430\u0434\u0432\u043e\u043a\u0430\u0442: {caseData.lawyer.user.name}</p>
+            <p className="text-text-secondary text-sm mt-2">Ваш адвокат: {caseData.lawyer.user.name}</p>
           )}
         </div>
 
@@ -83,19 +83,19 @@ export function ClientDashboardPage() {
             <div className="grid grid-cols-2 gap-3">
               <Card className="text-center cursor-pointer active:scale-[0.98]">
                 <FileText size={24} className="mx-auto text-accent-blue mb-2" />
-                <p className="text-sm font-medium text-text-primary">\u0424\u0430\u0439\u043b\u0438</p>
+                <p className="text-sm font-medium text-text-primary">Файли</p>
               </Card>
               <Card className="text-center cursor-pointer active:scale-[0.98]">
                 <Calendar size={24} className="mx-auto text-accent-teal mb-2" />
-                <p className="text-sm font-medium text-text-primary">\u0417\u0430\u043f\u0438\u0441</p>
+                <p className="text-sm font-medium text-text-primary">Запис</p>
               </Card>
             </div>
           </>
         ) : (
           <Card className="text-center py-8">
             <Briefcase size={48} className="mx-auto text-text-muted/50 mb-3" />
-            <p className="text-text-secondary font-medium">\u0421\u043f\u0440\u0430\u0432\u0443 \u0449\u0435 \u043d\u0435 \u0441\u0442\u0432\u043e\u0440\u0435\u043d\u043e</p>
-            <p className="text-text-muted text-sm mt-1">\u0412\u0430\u0448 \u0430\u0434\u0432\u043e\u043a\u0430\u0442 \u0441\u043a\u043e\u0440\u043e \u0437\u0432'\u044f\u0436\u0435\u0442\u044c\u0441\u044f</p>
+            <p className="text-text-secondary font-medium">Справу ще не створено</p>
+            <p className="text-text-muted text-sm mt-1">Ваш адвокат скоро зв'яжеться</p>
           </Card>
         )}
       </div>

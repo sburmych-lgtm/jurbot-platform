@@ -44,18 +44,18 @@ export function BookingPage() {
             <Check size={32} className="text-accent-green" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-text-primary">\u0417\u0430\u043f\u0438\u0441\u0430\u043d\u043e!</h1>
-            <p className="text-text-muted text-sm mt-1">\u0412\u0430\u0448 \u043d\u043e\u043c\u0435\u0440: <span className="font-mono text-accent-teal">{refNumber}</span></p>
+            <h1 className="text-xl font-bold text-text-primary">Записано!</h1>
+            <p className="text-text-muted text-sm mt-1">Ваш номер: <span className="font-mono text-accent-teal">{refNumber}</span></p>
           </div>
           <Card>
             <div className="space-y-2">
-              <SummaryRow label="\u0414\u0430\u0442\u0430" value={selectedDate} />
-              <SummaryRow label="\u0427\u0430\u0441" value={selectedTime} />
-              <SummaryRow label="\u0422\u0438\u043f" value={APPOINTMENT_TYPES.find(t => t.id === type)?.label ?? type} />
+              <SummaryRow label="Дата" value={selectedDate} />
+              <SummaryRow label="Час" value={selectedTime} />
+              <SummaryRow label="Тип" value={APPOINTMENT_TYPES.find(t => t.id === type)?.label ?? type} />
             </div>
           </Card>
           <Button size="lg" className="w-full" onClick={() => { setStep(1); setSelectedDate(''); setSelectedTime(''); }}>
-            \u041d\u043e\u0432\u0438\u0439 \u0437\u0430\u043f\u0438\u0441
+            Новий запис
           </Button>
         </div>
       </PageContainer>
@@ -71,7 +71,7 @@ export function BookingPage() {
               <ChevronLeft size={20} className="text-text-secondary" />
             </button>
           )}
-          <h1 className="text-xl font-bold text-text-primary">\u0417\u0430\u043f\u0438\u0441 \u043d\u0430 \u043a\u043e\u043d\u0441\u0443\u043b\u044c\u0442\u0430\u0446\u0456\u044e</h1>
+          <h1 className="text-xl font-bold text-text-primary">Запис на консультацію</h1>
         </div>
 
         <ProgressSteps total={3} current={step} />
@@ -90,12 +90,12 @@ export function BookingPage() {
           <div className="space-y-4">
             <Card>
               <div className="space-y-2 mb-4">
-                <SummaryRow label="\u0414\u0430\u0442\u0430" value={selectedDate} />
-                <SummaryRow label="\u0427\u0430\u0441" value={selectedTime} />
+                <SummaryRow label="Дата" value={selectedDate} />
+                <SummaryRow label="Час" value={selectedTime} />
               </div>
               <div className="space-y-3">
                 <div>
-                  <label className="text-sm font-medium text-text-secondary mb-2 block">\u0422\u0438\u043f \u0437\u0443\u0441\u0442\u0440\u0456\u0447\u0456</label>
+                  <label className="text-sm font-medium text-text-secondary mb-2 block">Тип зустрічі</label>
                   <div className="flex flex-wrap gap-2">
                     {APPOINTMENT_TYPES.map(t => (
                       <button
@@ -113,18 +113,18 @@ export function BookingPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-text-secondary mb-1 block">\u041d\u043e\u0442\u0430\u0442\u043a\u0438</label>
+                  <label className="text-sm font-medium text-text-secondary mb-1 block">Нотатки</label>
                   <textarea
                     value={notes}
                     onChange={e => setNotes(e.target.id)}
-                    placeholder="\u041e\u043f\u0438\u0448\u0456\u0442\u044c \u0432\u0430\u0448\u0435 \u043f\u0438\u0442\u0430\u043d\u043d\u044f..."
+                    placeholder="Опишіть ваше питання..."
                     className="w-full px-4 py-3 rounded-[14px] border border-border-default bg-bg-tertiary text-text-primary placeholder-text-muted focus:border-accent-teal focus:outline-none text-sm resize-none min-h-[80px]"
                   />
                 </div>
               </div>
             </Card>
             <Button size="lg" className="w-full" loading={loading} onClick={handleBook}>
-              \u041f\u0456\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0438 \u0437\u0430\u043f\u0438\u0441
+              Підтвердити запис
             </Button>
           </div>
         )}

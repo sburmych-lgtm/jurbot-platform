@@ -40,10 +40,10 @@ export function IntakePage() {
   return (
     <PageContainer>
       <div className="space-y-4">
-        <h1 className="text-xl font-bold text-text-primary">\u0417\u0430\u044f\u0432\u043a\u0438</h1>
+        <h1 className="text-xl font-bold text-text-primary">Заявки</h1>
 
         {items.length === 0 ? (
-          <EmptyState icon={Inbox} title="\u041d\u043e\u0432\u0438\u0445 \u0437\u0430\u044f\u0432\u043e\u043a \u043d\u0435\u043c\u0430\u0454" description="\u0417\u0430\u044f\u0432\u043a\u0438 \u0432\u0456\u0434 \u043a\u043b\u0456\u0454\u043d\u0442\u0456\u0432 \u0437'\u044f\u0432\u043b\u044f\u0442\u044c\u0441\u044f \u0442\u0443\u0442" />
+          <EmptyState icon={Inbox} title="Нових заявок немає" description="Заявки від клієнтів з'являться тут" />
         ) : (
           <div className="space-y-3">
             {items.map(item => {

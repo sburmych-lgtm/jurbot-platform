@@ -40,11 +40,11 @@ export function TimeSlots({ date, selected, onSelect, busySlots = [] }: TimeSlot
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-text-primary">\u041e\u0431\u0435\u0440\u0456\u0442\u044c \u0447\u0430\u0441</h2>
+        <h2 className="text-xl font-bold text-text-primary">Оберіть час</h2>
         <span className="text-sm text-text-muted">{formatDateUk(date)}</span>
       </div>
-      {renderSlots(MORNING, '\u0420\u0430\u043d\u043e\u043a')}
-      {renderSlots(AFTERNOON, '\u0414\u0435\u043d\u044c')}
+      {renderSlots(MORNING, 'Ранок')}
+      {renderSlots(AFTERNOON, 'День')}
     </div>
   );
 }

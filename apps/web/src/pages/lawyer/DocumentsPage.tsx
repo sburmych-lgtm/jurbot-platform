@@ -80,7 +80,7 @@ export function LawyerDocumentsPage() {
             <button onClick={() => setView('list')} className="p-1.5 rounded-[10px] hover:bg-bg-hover">
               <ArrowLeft size={20} className="text-text-secondary" />
             </button>
-            <h1 className="text-xl font-bold text-text-primary">\u0428\u0430\u0431\u043b\u043e\u043d\u0438</h1>
+            <h1 className="text-xl font-bold text-text-primary">Шаблони</h1>
           </div>
           <div className="grid grid-cols-2 gap-3">
             {templates.map(t => (
@@ -105,7 +105,7 @@ export function LawyerDocumentsPage() {
           <DynamicForm template={selectedTemplate} values={formValues} onChange={(f, v) => setFormValues(p => ({ ...p, [f]: v }))} />
           <Button size="lg" className="w-full" onClick={generate}>
             <Sparkles size={18} />
-            \u0417\u0433\u0435\u043d\u0435\u0440\u0443\u0432\u0430\u0442\u0438
+            Згенерувати
           </Button>
         </div>
       </PageContainer>
@@ -113,7 +113,7 @@ export function LawyerDocumentsPage() {
   }
 
   if (view === 'generating') {
-    return <Spinner text="\u0413\u0435\u043d\u0435\u0440\u0430\u0446\u0456\u044f \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0443..." subtext="AI \u043f\u0440\u0430\u0446\u044e\u0454" />;
+    return <Spinner text="Генерація документу..." subtext="AI працює" />;
   }
 
   if (view === 'preview') {
@@ -124,11 +124,11 @@ export function LawyerDocumentsPage() {
             <button onClick={() => setView('list')} className="p-1.5 rounded-[10px] hover:bg-bg-hover">
               <ArrowLeft size={20} className="text-text-secondary" />
             </button>
-            <h1 className="text-xl font-bold text-text-primary">\u041f\u0435\u0440\u0435\u0433\u043b\u044f\u0434</h1>
+            <h1 className="text-xl font-bold text-text-primary">Перегляд</h1>
           </div>
           <DocumentPreview content={preview} />
           <Button size="lg" className="w-full" onClick={() => setView('list')}>
-            \u0417\u0431\u0435\u0440\u0435\u0433\u0442\u0438
+            Зберегти
           </Button>
         </div>
       </PageContainer>
@@ -139,19 +139,19 @@ export function LawyerDocumentsPage() {
     <PageContainer>
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-text-primary">AI \u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0438</h1>
+          <h1 className="text-xl font-bold text-text-primary">AI Документи</h1>
           <Button size="sm" onClick={loadTemplates}>
             <Sparkles size={16} />
-            \u0421\u0442\u0432\u043e\u0440\u0438\u0442\u0438
+            Створити
           </Button>
         </div>
 
         {docs.length === 0 ? (
           <EmptyState
             icon={FileText}
-            title="\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0456\u0432 \u043d\u0435\u043c\u0430\u0454"
-            description="\u0421\u0442\u0432\u043e\u0440\u0456\u0442\u044c \u043f\u0435\u0440\u0448\u0438\u0439 AI-\u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442"
-            actionLabel="\u0421\u0442\u0432\u043e\u0440\u0438\u0442\u0438"
+            title="Документів немає"
+            description="Створіть перший AI-документ"
+            actionLabel="Створити"
             onAction={loadTemplates}
           />
         ) : (
