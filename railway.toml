@@ -1,7 +1,11 @@
 [build]
-buildCommand = "npx prisma generate --schema packages/db/prisma/schema.prisma && npx prisma db push --schema packages/db/prisma/schema.prisma --accept-data-loss && npm run build -w packages/shared && npm run build -w packages/db && npm run build -w packages/telegram && npm run build -w apps/backend"
+buildCommand = "npx prisma generate --schema packages/db/prisma/schema.prisma && npm run build -w packages/shared && npm run build -w packages/db && npm run build -w packages/telegram && npm run build -w apps/backend"
 
 [deploy]
 startCommand = "node apps/backend/dist/index.js"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 30
+
+# Runs after build but before start — has access to Railway's private network
+# This is where DB schema sync happens (prisma db push)
+preDeployCommand = "npx prisma db push --schema packages/db/prisma/schema.prisma --accept-data-loss"
