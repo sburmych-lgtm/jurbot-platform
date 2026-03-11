@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { api } from './api';
+import { isTelegramWebApp, getTelegramUser } from './telegram';
 
 export interface AuthUser {
   id: string;
@@ -15,6 +16,7 @@ interface AuthState {
   user: AuthUser | null;
   accessToken: string | null;
   loading: boolean;
+  isTelegram: boolean;
 }
 
 interface AuthContextValue extends AuthState {
@@ -31,11 +33,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: null,
     accessToken: null,
     loading: true,
+    isTelegram: isTelegramWebApp(),
   });
 
   const setAuth = useCallback((user: AuthUser | null, accessToken: string | null) => {
     api.setToken(accessToken);
-    setState({ user, accessToken, loading: false });
+    setState((s) => ({ ...s, user, accessToken, loading: false }));
   }, []);
 
   // Load user on mount
@@ -43,12 +46,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await api.get<{ user: AuthUser; accessToken: string }>('/auth/me');
+        // For Telegram: initData header is auto-attached by ApiClient
+        // For JWT: tries the refresh cookie via /auth/me
+        const res = await api.get<{ user: AuthUser; accessToken?: string }>('/auth/me');
         if (!cancelled && res.data) {
-          setAuth(res.data.user, res.data.accessToken);
+          setAuth(res.data.user, res.data.accessToken ?? null);
         }
       } catch {
-        if (!cancelled) setAuth(null, null);
+        if (!cancelled) {
+          // If in Telegram but auth failed, user might not be registered yet
+          if (isTelegramWebApp()) {
+            const tgUser = getTelegramUser();
+            if (tgUser) {
+              console.warn('[Auth] Telegram user not found in DB, showing registration prompt');
+            }
+          }
+          setAuth(null, null);
+        }
       }
     })();
     return () => { cancelled = true; };

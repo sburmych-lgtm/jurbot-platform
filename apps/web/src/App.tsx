@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { RouteGuard } from '@/components/auth/RouteGuard';
+import { useAuth } from '@/lib/auth';
 
 // Public pages
 import { LoginPage } from '@/pages/public/LoginPage';
@@ -27,6 +28,22 @@ import { BookingPage } from '@/pages/client/BookingPage';
 // Shared pages
 import { NotificationsPage } from '@/pages/shared/NotificationsPage';
 import { ProfilePage } from '@/pages/shared/ProfilePage';
+
+function HomeRedirect() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#050810]">
+        <div className="text-[#a0aec0] text-lg">Завантаження...</div>
+      </div>
+    );
+  }
+
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'LAWYER') return <Navigate to="/lawyer" replace />;
+  return <Navigate to="/client" replace />;
+}
 
 export function App() {
   return (
@@ -62,8 +79,8 @@ export function App() {
       </Route>
 
       {/* Redirects */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="/" element={<HomeRedirect />} />
+      <Route path="*" element={<HomeRedirect />} />
     </Routes>
   );
 }

@@ -1,3 +1,5 @@
+import { isTelegramWebApp, getInitData } from './telegram';
+
 const API_BASE = '/api';
 
 export interface ApiResponse<T = unknown> {
@@ -19,6 +21,12 @@ class ApiClient {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string> | undefined),
     };
+
+    // Telegram Mini App auth (primary)
+    if (isTelegramWebApp()) {
+      headers['X-Telegram-Init-Data'] = getInitData();
+    }
+    // JWT fallback (for dev/testing)
     if (this.accessToken) {
       headers['Authorization'] = `Bearer ${this.accessToken}`;
     }
