@@ -63,4 +63,13 @@ process.on('SIGTERM', () => {
   server.close(() => process.exit(0));
 });
 
+// Prevent unhandled promise rejections from crashing the process
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Backend] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[Backend] Uncaught Exception:', err);
+});
+
 export { app };
