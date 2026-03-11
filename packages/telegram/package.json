@@ -19,6 +19,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "grammy": "^1.35.0"
+    "grammy": "^1.35.0",
+    "@jurbot/db": "*"
   }
 }

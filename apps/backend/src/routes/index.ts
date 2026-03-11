@@ -10,6 +10,8 @@ import { intakeRouter } from './intake.routes.js';
 import { timelogsRouter } from './timelogs.routes.js';
 import { notificationsRouter } from './notifications.routes.js';
 import { telegramRouter } from './telegram.routes.js';
+import { tokensRouter } from './tokens.routes.js';
+import { subscriptionRouter } from './subscription.routes.js';
 
 export const apiRouter = Router();
 
@@ -26,4 +28,6 @@ apiRouter.use('/v1/appointments', appointmentsRouter);
 apiRouter.use('/v1/intake', intakeRouter);
 apiRouter.use('/v1/timelogs', timelogsRouter);
 apiRouter.use('/v1/notifications', notificationsRouter);
+apiRouter.use('/v1/tokens', tokensRouter);
+apiRouter.use('/v1/subscription', subscriptionRouter);
 apiRouter.use('/telegram', telegramRouter);

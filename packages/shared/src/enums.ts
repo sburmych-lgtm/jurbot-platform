@@ -34,3 +34,22 @@ export const NotificationType = {
   DOCUMENT_READY: 'DOCUMENT_READY', MESSAGE: 'MESSAGE', SYSTEM: 'SYSTEM',
 } as const;
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];
+
+export const OrgRole = { OWNER: 'OWNER', ADMIN: 'ADMIN', MEMBER: 'MEMBER' } as const;
+export type OrgRole = (typeof OrgRole)[keyof typeof OrgRole];
+
+export const TokenType = { PUBLIC_LAWYER: 'PUBLIC_LAWYER', PRIVATE_CASE: 'PRIVATE_CASE' } as const;
+export type TokenType = (typeof TokenType)[keyof typeof TokenType];
+
+export const SubscriptionPlan = { TRIAL: 'TRIAL', BASIC: 'BASIC', PRO: 'PRO', BUREAU: 'BUREAU' } as const;
+export type SubscriptionPlan = (typeof SubscriptionPlan)[keyof typeof SubscriptionPlan];
+
+export const SubscriptionStatus = {
+  ACTIVE: 'ACTIVE', TRIAL: 'TRIAL', EXPIRED: 'EXPIRED', CANCELLED: 'CANCELLED',
+} as const;
+export type SubscriptionStatus = (typeof SubscriptionStatus)[keyof typeof SubscriptionStatus];
+
+export const IntakeStatus = {
+  PENDING: 'PENDING', ACCEPTED: 'ACCEPTED', REJECTED: 'REJECTED',
+} as const;
+export type IntakeStatus = (typeof IntakeStatus)[keyof typeof IntakeStatus];

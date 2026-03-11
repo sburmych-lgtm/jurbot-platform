@@ -4,8 +4,8 @@ import { signAccessToken, signRefreshToken } from '../utils/jwt.js';
 import { AppError } from '../middleware/errorHandler.js';
 import type { RegisterInput, LoginInput, UserPayload, TokenPair } from '@jurbot/shared';
 
-function toPayload(user: { id: string; email: string; role: string; name: string }): UserPayload {
-  return { id: user.id, email: user.email, role: user.role, name: user.name };
+function toPayload(user: { id: string; email: string | null; role: string; name: string }): UserPayload {
+  return { id: user.id, email: user.email ?? '', role: user.role, name: user.name };
 }
 
 function generateTokens(payload: UserPayload): TokenPair {
@@ -45,6 +45,10 @@ export async function login(input: LoginInput): Promise<{ user: UserPayload; tok
   const user = await prisma.user.findUnique({ where: { email: input.email } });
   if (!user || !user.isActive) {
     throw new AppError(401, 'Невірний email або пароль');
+  }
+
+  if (!user.password) {
+    throw new AppError(401, 'Цей акаунт використовує Telegram для входу');
   }
 
   const valid = await comparePassword(input.password, user.password);

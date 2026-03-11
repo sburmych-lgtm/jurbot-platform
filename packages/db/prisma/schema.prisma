@@ -15,12 +15,12 @@ enum Role {
 }
 
 enum CaseStatus {
-  INTAKE        // accepted from intake form
-  ANALYSIS      // lawyer reviewing
-  PREPARATION   // documents being prepared
-  FILED         // submitted to court
-  AWAITING      // awaiting court decision
-  COMPLETED     // case closed
+  INTAKE
+  ANALYSIS
+  PREPARATION
+  FILED
+  AWAITING
+  COMPLETED
 }
 
 enum CaseCategory {
@@ -35,9 +35,9 @@ enum CaseCategory {
 }
 
 enum Urgency {
-  URGENT   // 24 hours
-  WEEK     // within a week
-  NORMAL   // not urgent
+  URGENT
+  WEEK
+  NORMAL
 }
 
 enum AppointmentStatus {
@@ -48,15 +48,15 @@ enum AppointmentStatus {
 }
 
 enum AppointmentType {
-  FREE         // 30 min, free
-  CONSULT      // 60 min, 1500 UAH
-  ANALYSIS     // 90 min, 2500 UAH
+  FREE
+  CONSULT
+  ANALYSIS
 }
 
 enum DocumentStatus {
   DRAFT
-  PENDING_SIGNATURE   // "Na pidpysi"
-  READY               // "Hotovyi"
+  PENDING_SIGNATURE
+  READY
   ARCHIVED
 }
 
@@ -68,166 +68,306 @@ enum NotificationType {
   SYSTEM
 }
 
-// --- Core Entities ---
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
 
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String   // bcrypt hash
-  role      Role
-  name      String
-  phone     String?
-  city      String?
-  avatarUrl String?
-  isActive  Boolean  @default(true)
+enum TokenType {
+  PUBLIC_LAWYER
+  PRIVATE_CASE
+}
+
+enum SubscriptionPlan {
+  TRIAL
+  BASIC
+  PRO
+  BUREAU
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIAL
+  EXPIRED
+  CANCELLED
+}
+
+enum IntakeStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+// --- Multi-tenancy ---
+
+model Organization {
+  id   String @id @default(uuid())
+  name String
+  slug String @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  members       OrganizationMember[]
+  inviteTokens  InviteToken[]
+  subscription  Subscription?
+  usageCounters UsageCounter[]
+  cases         Case[]
+  appointments  Appointment[]
+  documents     Document[]
+  intakes       IntakeSubmission[]
+  notifications Notification[]
+
+  @@index([slug])
+}
+
+model OrganizationMember {
+  id     String       @id @default(uuid())
+  orgId  String
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId String
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   OrgRole      @default(MEMBER)
+
+  createdAt DateTime @default(now())
+
+  @@unique([orgId, userId])
+  @@index([orgId])
+  @@index([userId])
+}
+
+// --- Invite Tokens ---
+
+model InviteToken {
+  id         String        @id @default(uuid())
+  orgId      String
+  org        Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  lawyerId   String
+  lawyer     LawyerProfile @relation(fields: [lawyerId], references: [id], onDelete: Cascade)
+  token      String        @unique
+  tokenType  TokenType
+  caseId     String?
+  expiresAt  DateTime?
+  isActive   Boolean       @default(true)
+  usageCount Int           @default(0)
+  maxUses    Int?
+
+  createdAt DateTime @default(now())
+
+  clientProfiles ClientProfile[]
+
+  @@index([token])
+  @@index([orgId])
+  @@index([lawyerId])
+}
+
+// --- Subscription & Usage ---
+
+model Subscription {
+  id              String             @id @default(uuid())
+  orgId           String             @unique
+  org             Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  plan            SubscriptionPlan   @default(TRIAL)
+  status          SubscriptionStatus @default(TRIAL)
+  startedAt       DateTime           @default(now())
+  expiresAt       DateTime?
+  trialUsed       Boolean            @default(false)
+  paymentProvider String?
+  paymentId       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([status])
+}
+
+model UsageCounter {
+  id           String       @id @default(uuid())
+  orgId        String
+  org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  period       String
+  clientsCount Int          @default(0)
+  casesCount   Int          @default(0)
+  aiDocsCount  Int          @default(0)
+  uploadsCount Int          @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, period])
+  @@index([orgId])
+}
+
+// --- Core Entities ---
+
+model User {
+  id         String  @id @default(uuid())
+  email      String? @unique
+  password   String?
+  role       Role
+  name       String
+  phone      String?
+  city       String?
+  avatarUrl  String?
+  telegramId BigInt? @unique
+  isActive   Boolean @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  // Relations
-  lawyerProfile    LawyerProfile?
-  clientProfile    ClientProfile?
-  notifications    Notification[]
-  telegramIdentity TelegramIdentity?
-  uploads          Upload[]
-
-  // Chat relations
-  sentMessages     Message[] @relation("sender")
+  lawyerProfile       LawyerProfile?
+  clientProfile       ClientProfile?
+  notifications       Notification[]
+  telegramIdentity    TelegramIdentity?
+  uploads             Upload[]
+  organizationMembers OrganizationMember[]
+  sentMessages        Message[]            @relation("sender")
 
   @@index([email])
   @@index([role])
+  @@index([telegramId])
 }
 
 model LawyerProfile {
-  id          String   @id @default(uuid())
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  licenseNo   String?  // svidotstvo advokata
+  id          String         @id @default(uuid())
+  userId      String         @unique
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orgId       String?
+  licenseNo   String?
   specialties CaseCategory[]
   bio         String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
   cases        Case[]
   appointments Appointment[]
   timeLogs     TimeLog[]
+  inviteTokens InviteToken[]
 
   @@index([userId])
+  @@index([orgId])
 }
 
 model ClientProfile {
-  id          String   @id @default(uuid())
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accessCode  String   @unique // 6-digit portal access code
-  taxId       String?  // IPN
+  id            String       @id @default(uuid())
+  userId        String       @unique
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orgId         String?
+  accessCode    String       @unique
+  taxId         String?
+  sourceTokenId String?
+  sourceToken   InviteToken? @relation(fields: [sourceTokenId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
   cases        Case[]
   appointments Appointment[]
   intakeForm   IntakeSubmission?
 
   @@index([userId])
   @@index([accessCode])
+  @@index([orgId])
 }
 
 model IntakeSubmission {
-  id          String       @id @default(uuid())
-  clientId    String       @unique
+  id          String        @id @default(uuid())
+  clientId    String        @unique
   client      ClientProfile @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  orgId       String?
+  org         Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
   category    CaseCategory
   urgency     Urgency
   description String
   city        String?
-  fileName    String?       // original upload filename
-
-  // Lead scoring (computed)
-  leadScore   String?       // HOT / WARM / COLD
+  fileName    String?
+  status      IntakeStatus  @default(PENDING)
+  leadScore   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([clientId])
+  @@index([orgId])
+  @@index([status])
 }
 
 model Case {
   id          String       @id @default(uuid())
-  caseNumber  String       @unique // CS-2026-XXXX
-  title       String       // "Rozluchennia ta rozdil maina"
+  caseNumber  String       @unique
+  title       String
   category    CaseCategory
   status      CaseStatus   @default(INTAKE)
   urgency     Urgency      @default(NORMAL)
   description String?
-
-  // Court info
   courtName   String?
   courtDate   DateTime?
   courtRoom   String?
-
-  // Next action
   nextAction  String?
   nextDate    DateTime?
 
-  // Relations
-  lawyerId    String
-  lawyer      LawyerProfile @relation(fields: [lawyerId], references: [id], onDelete: Restrict)
-  clientId    String
-  client      ClientProfile @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  lawyerId String
+  lawyer   LawyerProfile @relation(fields: [lawyerId], references: [id], onDelete: Restrict)
+  clientId String
+  client   ClientProfile @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  orgId    String?
+  org      Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
 
-  documents   Document[]
+  documents    Document[]
   appointments Appointment[]
-  timeLogs    TimeLog[]
-  messages    Message[]
-  checklist   ChecklistItem[]
+  timeLogs     TimeLog[]
+  messages     Message[]
+  checklist    ChecklistItem[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([caseNumber])
   @@index([lawyerId])
   @@index([clientId])
   @@index([status])
+  @@index([orgId])
 }
 
 model Document {
-  id       String         @id @default(uuid())
-  name     String         // "Pozovna zaiava.pdf"
-  status   DocumentStatus @default(DRAFT)
-  type     String?        // template ID: pozov, vidzyv, dogovir, etc.
-  content  String?        // generated document text content
-  size     String?        // "245 KB"
+  id      String         @id @default(uuid())
+  name    String
+  status  DocumentStatus @default(DRAFT)
+  type    String?
+  content String?
+  size    String?
 
-  // Relations
   caseId   String
-  case     Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  uploadId String?  @unique
-  upload   Upload?  @relation(fields: [uploadId], references: [id], onDelete: SetNull)
+  case     Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  orgId    String?
+  org      Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  uploadId String?       @unique
+  upload   Upload?       @relation(fields: [uploadId], references: [id], onDelete: SetNull)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([caseId])
   @@index([status])
+  @@index([orgId])
 }
 
 model Upload {
-  id           String  @id @default(uuid())
-  originalName String  // original filename
-  storagePath  String  // path on disk or S3 key
+  id           String @id @default(uuid())
+  originalName String
+  storagePath  String
   mimeType     String
   sizeBytes    Int
   uploadedById String
-  uploadedBy   User    @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  uploadedBy   User   @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
 
-  document     Document?
+  document Document?
 
   createdAt DateTime @default(now())
 
@@ -236,21 +376,22 @@ model Upload {
 
 model Appointment {
   id        String            @id @default(uuid())
-  refNumber String            @unique // BK-2026-XXXX
+  refNumber String            @unique
   type      AppointmentType
   status    AppointmentStatus @default(PENDING)
-  date      DateTime          // date + time combined
-  duration  Int               // in minutes: 30, 60, 90
-  price     Int               // in UAH kopecks: 0, 150000, 250000
+  date      DateTime
+  duration  Int
+  price     Int
   notes     String?
 
-  // Relations
-  lawyerId  String
-  lawyer    LawyerProfile @relation(fields: [lawyerId], references: [id], onDelete: Restrict)
-  clientId  String
-  client    ClientProfile @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  caseId    String?
-  case      Case?         @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  lawyerId String
+  lawyer   LawyerProfile @relation(fields: [lawyerId], references: [id], onDelete: Restrict)
+  clientId String
+  client   ClientProfile @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  caseId   String?
+  case     Case?         @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  orgId    String?
+  org      Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
 
   reminders AppointmentReminder[]
 
@@ -261,15 +402,16 @@ model Appointment {
   @@index([clientId])
   @@index([date])
   @@index([status])
+  @@index([orgId])
 }
 
 model AppointmentReminder {
   id            String      @id @default(uuid())
   appointmentId String
   appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
-  timing        String      // "1d", "2h", "30m"
+  timing        String
   enabled       Boolean     @default(true)
-  sentAt        DateTime?   // null = not yet sent
+  sentAt        DateTime?
 
   createdAt DateTime @default(now())
 
@@ -310,12 +452,12 @@ model Message {
 }
 
 model ChecklistItem {
-  id      String  @id @default(uuid())
-  caseId  String
-  case    Case    @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  text    String
-  done    Boolean @default(false)
-  order   Int     @default(0)
+  id     String  @id @default(uuid())
+  caseId String
+  case   Case    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  text   String
+  done   Boolean @default(false)
+  order  Int     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -324,35 +466,36 @@ model ChecklistItem {
 }
 
 model Notification {
-  id      String           @id @default(uuid())
-  userId  String
-  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type    NotificationType
-  title   String
-  body    String
-  isRead  Boolean          @default(false)
-  link    String?          // deep link within app
-
-  // Telegram delivery
-  telegramSent Boolean @default(false)
+  id           String           @id @default(uuid())
+  userId       String
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orgId        String?
+  org          Organization?    @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  type         NotificationType
+  title        String
+  body         String
+  isRead       Boolean          @default(false)
+  link         String?
+  telegramSent Boolean          @default(false)
 
   createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([isRead])
+  @@index([orgId])
 }
 
 model TelegramIdentity {
-  id             String  @id @default(uuid())
-  userId         String  @unique
-  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  telegramId     BigInt  @unique // Telegram numeric user ID
+  id               String  @id @default(uuid())
+  userId           String  @unique
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  telegramId       BigInt  @unique
   telegramUsername String?
-  chatId         BigInt  // for sending messages
-  botType        String  // "lawyer" | "client"
-  isVerified     Boolean @default(false)
+  chatId           BigInt
+  botType          String
+  isVerified       Boolean @default(false)
 
-  linkedAt DateTime @default(now())
+  linkedAt  DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([telegramId])

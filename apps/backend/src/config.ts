@@ -14,6 +14,7 @@ const envSchema = z.object({
   TELEGRAM_BOT_TOKEN_CLIENT: z.string().default('PLACEHOLDER_PROVIDE_LATER'),
   TELEGRAM_WEBHOOK_SECRET: z.string().default('dev-webhook-secret'),
   TELEGRAM_WEBHOOK_URL: z.string().default(''),
+  MINIAPP_URL: z.string().default(''),
   UPLOAD_DIR: z.string().default('./uploads'),
   MAX_FILE_SIZE: z.string().default('10485760'),
 });
@@ -38,6 +39,7 @@ export const config = {
   telegramClientToken: env.TELEGRAM_BOT_TOKEN_CLIENT,
   telegramWebhookSecret: env.TELEGRAM_WEBHOOK_SECRET,
   telegramWebhookUrl: env.TELEGRAM_WEBHOOK_URL,
+  miniAppUrl: env.MINIAPP_URL,
   uploadDir: env.UPLOAD_DIR,
   maxFileSize: parseInt(env.MAX_FILE_SIZE, 10),
 } as const;
