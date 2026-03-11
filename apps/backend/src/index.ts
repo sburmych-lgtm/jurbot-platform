@@ -2,10 +2,15 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { config } from './config.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { globalLimiter } from './middleware/rateLimit.js';
 import { apiRouter } from './routes/index.js';
 import { initBots, registerWebhooks } from './lib/telegram.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 
@@ -14,10 +19,23 @@ app.use(cors({ origin: config.frontendUrl, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
+// Global rate limiting: 100 req/min per IP
+app.use('/api', globalLimiter);
+
 // Initialize Telegram bots (before routes so handlers are ready)
 initBots();
 
 app.use('/api', apiRouter);
+
+// Serve Mini App static files in production
+if (config.nodeEnv === 'production') {
+  const webDist = path.join(__dirname, '..', '..', 'web', 'dist');
+  app.use(express.static(webDist));
+  // SPA fallback: serve index.html for non-API routes
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(webDist, 'index.html'));
+  });
+}
 
 app.use(errorHandler);
 

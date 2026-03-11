@@ -3,8 +3,12 @@ import { loginSchema, registerSchema, portalLoginSchema } from '@jurbot/shared';
 import { validate } from '../middleware/validate.js';
 import { authenticate } from '../middleware/auth.js';
 import * as authService from '../services/auth.service.js';
+import { authLimiter } from '../middleware/rateLimit.js';
 
 export const authRouter = Router();
+
+// Rate limit auth endpoints: 10 req/15min per IP
+authRouter.use(authLimiter);
 
 authRouter.post('/register', validate(registerSchema), async (req, res, next) => {
   try {

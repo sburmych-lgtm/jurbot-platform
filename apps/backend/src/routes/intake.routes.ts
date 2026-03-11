@@ -6,11 +6,13 @@ import { validate } from '../middleware/validate.js';
 import { parsePagination } from '../utils/pagination.js';
 import { param } from '../utils/params.js';
 import * as intakeService from '../services/intake.service.js';
+import { intakeLimiter } from '../middleware/rateLimit.js';
 
 export const intakeRouter = Router();
 
+
 // POST /intake — PUBLIC (submit intake form)
-intakeRouter.post('/', validate(intakeSubmissionSchema), async (req, res, next) => {
+intakeRouter.post('/', intakeLimiter, validate(intakeSubmissionSchema), async (req, res, next) => {
   try {
     const result = await intakeService.submit(req.body);
     res.status(201).json({ success: true, data: result });
