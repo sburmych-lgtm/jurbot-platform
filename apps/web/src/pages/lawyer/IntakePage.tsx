@@ -1,35 +1,24 @@
 import { useState, useEffect } from 'react';
-import { Inbox, ArrowRight } from 'lucide-react';
+import { Inbox, ChevronRight } from 'lucide-react';
+import { api } from '@/lib/api';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Spinner } from '@/components/ui/Spinner';
-import { api } from '@/lib/api';
 
 interface IntakeItem {
   id: string;
   category: string;
   urgency: string;
   description: string;
-  leadScore?: string;
+  leadScore: number;
   createdAt: string;
-  client?: { user: { name: string; email: string; phone?: string } };
+  client: { user: { name: string; email: string; phone?: string; city?: string } };
 }
 
-const categoryLabels: Record<string, string> = {
-  FAMILY: 'Сімейне', CIVIL: 'Цивільне', COMMERCIAL: 'Господарське',
-  CRIMINAL: 'Кримінальне', MIGRATION: 'Міграційне', REALESTATE: 'Нерухомість',
-  LABOR: 'Трудове', OTHER: 'Інше',
-};
-
-const leadColors: Record<string, 'red' | 'orange' | 'blue'> = {
-  HOT: 'red', WARM: 'orange', COLD: 'blue',
-};
-
-const leadLabels: Record<string, string> = {
-  HOT: 'Гарячий', WARM: 'Теплий', COLD: 'Холодний',
+const leadColors: Record<string, 'green' | 'yellow' | 'red'> = {
+  HOT: 'red', WARM: 'yellow', COLD: 'green',
 };
 
 export function IntakePage() {
@@ -39,57 +28,46 @@ export function IntakePage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.get<IntakeItem[]>('/v1/intake');
-        setItems(res.data ?? []);
-      } catch { setItems([]); }
-      finally { setLoading(false); }
+        const res = await api.get<{ items: IntakeItem[] }>('/v1/intake');
+        setItems(res.data?.items ?? []);
+      } catch {}
+      setLoading(false);
     })();
   }, []);
-
-  const handleConvert = async (id: string) => {
-    try {
-      await api.post(`/v1/intake/${id}/convert`, {});
-      setItems(prev => prev.filter(i => i.id !== id));
-    } catch { /* TODO: show toast */ }
-  };
 
   if (loading) return <Spinner />;
 
   return (
     <PageContainer>
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold text-navy-900">Заявки</h1>
+        <h1 className="text-xl font-bold text-text-primary">\u0417\u0430\u044f\u0432\u043a\u0438</h1>
 
         {items.length === 0 ? (
-          <EmptyState icon={Inbox} title="Нових заявок немає" description="Заявки з'являться тут після заповнення форми прийому" />
+          <EmptyState icon={Inbox} title="\u041d\u043e\u0432\u0438\u0445 \u0437\u0430\u044f\u0432\u043e\u043a \u043d\u0435\u043c\u0430\u0454" description="\u0417\u0430\u044f\u0432\u043a\u0438 \u0432\u0456\u0434 \u043a\u043b\u0456\u0454\u043d\u0442\u0456\u0432 \u0437'\u044f\u0432\u043b\u044f\u0442\u044c\u0441\u044f \u0442\u0443\u0442" />
         ) : (
           <div className="space-y-3">
-            {items.map(item => (
-              <Card key={item.id}>
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <p className="font-semibold text-navy-800 text-sm">{item.client?.user.name ?? 'Невідомий клієнт'}</p>
-                    <p className="text-xs text-navy-400 mt-0.5">{categoryLabels[item.category] ?? item.category}</p>
+            {items.map(item => {
+              const lead = item.leadScore >= 7 ? 'HOT' : item.leadScore >= 4 ? 'WARM' : 'COLD';
+              return (
+                <Card key={item.id} className="active:scale-[0.98] transition">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-text-primary text-sm">{item.client.user.name}</p>
+                      <p className="text-xs text-text-muted mt-0.5">{item.client.user.email}</p>
+                    </div>
+                    <Badge color={leadColors[lead]}>{lead}</Badge>
                   </div>
-                  <div className="flex gap-1">
-                    {item.leadScore && (
-                      <Badge color={leadColors[item.leadScore] ?? 'gray'}>
-                        {leadLabels[item.leadScore] ?? item.leadScore}
-                      </Badge>
-                    )}
+                  <p className="text-sm text-text-secondary line-clamp-2">{item.description}</p>
+                  <div className="flex items-center justify-between mt-3">
+                    <div className="flex gap-2">
+                      <Badge color="blue">{item.category}</Badge>
+                      <Badge color={item.urgency === 'HIGH' ? 'red' : item.urgency === 'MEDIUM' ? 'yellow' : 'gray'}>{item.urgency}</Badge>
+                    </div>
+                    <span className="text-xs text-text-muted">{new Date(item.createdAt).toLocaleDateString('uk-UA')}</span>
                   </div>
-                </div>
-                <p className="text-sm text-navy-600 line-clamp-2">{item.description}</p>
-                <div className="flex items-center justify-between mt-3">
-                  <span className="text-xs text-navy-400">
-                    {new Date(item.createdAt).toLocaleDateString('uk-UA')}
-                  </span>
-                  <Button size="sm" onClick={() => handleConvert(item.id)}>
-                    Створити справу <ArrowRight size={14} />
-                  </Button>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>

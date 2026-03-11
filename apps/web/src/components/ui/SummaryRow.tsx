@@ -6,8 +6,8 @@ interface SummaryRowProps {
 export function SummaryRow({ label, value }: SummaryRowProps) {
   return (
     <div className="flex justify-between text-sm">
-      <span className="text-navy-400">{label}</span>
-      <span className="text-navy-800 font-medium text-right max-w-[60%]">{value ?? '—'}</span>
+      <span className="text-text-muted">{label}</span>
+      <span className="text-text-primary font-medium text-right max-w-[60%]">{value ?? '\u2014'}</span>
     </div>
   );
 }

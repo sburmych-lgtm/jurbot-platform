@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { MONTHS_UK } from '@jurbot/shared';
 import { fmtDate } from '@/lib/utils';
 
-const DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+const DAYS = ['\u041f\u043d', '\u0412\u0442', '\u0421\u0440', '\u0427\u0442', '\u041f\u0442', '\u0421\u0431', '\u041d\u0434'];
 
 interface CalendarGridProps {
   selected: string;
@@ -26,19 +26,19 @@ export function CalendarGrid({ selected, onSelect }: CalendarGridProps) {
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
   return (
-    <div className="bg-white rounded-xl border border-navy-100 p-4">
+    <div className="bg-bg-card rounded-[14px] border border-border-default p-4">
       <div className="flex items-center justify-between mb-4">
-        <button onClick={() => setViewDate(new Date(year, month - 1, 1))} className="p-2 rounded-lg hover:bg-navy-50">
-          <ChevronLeft size={20} className="text-navy-600" />
+        <button onClick={() => setViewDate(new Date(year, month - 1, 1))} className="p-2 rounded-[10px] hover:bg-bg-hover">
+          <ChevronLeft size={20} className="text-text-secondary" />
         </button>
-        <span className="font-semibold text-navy-800">{MONTHS_UK[month]} {year}</span>
-        <button onClick={() => setViewDate(new Date(year, month + 1, 1))} className="p-2 rounded-lg hover:bg-navy-50">
-          <ChevronRight size={20} className="text-navy-600" />
+        <span className="font-semibold text-text-primary">{MONTHS_UK[month]} {year}</span>
+        <button onClick={() => setViewDate(new Date(year, month + 1, 1))} className="p-2 rounded-[10px] hover:bg-bg-hover">
+          <ChevronRight size={20} className="text-text-secondary" />
         </button>
       </div>
       <div className="grid grid-cols-7 gap-1 text-center">
         {DAYS.map(d => (
-          <div key={d} className="text-xs font-medium text-navy-400 py-1">{d}</div>
+          <div key={d} className="text-xs font-medium text-text-muted py-1">{d}</div>
         ))}
         {cells.map((day, i) => {
           if (!day) return <div key={i} />;
@@ -54,11 +54,11 @@ export function CalendarGrid({ selected, onSelect }: CalendarGridProps) {
               key={i}
               disabled={isPast || isWeekend}
               onClick={() => onSelect(dateStr)}
-              className={`w-10 h-10 rounded-lg text-sm font-medium mx-auto flex items-center justify-center transition ${
-                isSel ? 'bg-gold-500 text-navy-900 font-bold shadow-md'
-                : isPast || isWeekend ? 'text-navy-200 cursor-not-allowed'
-                : isToday ? 'bg-navy-100 text-navy-900 font-bold'
-                : 'text-navy-700 hover:bg-navy-50'
+              className={`w-10 h-10 rounded-[10px] text-sm font-medium mx-auto flex items-center justify-center transition ${
+                isSel ? 'bg-accent-teal text-bg-primary font-bold'
+                : isPast || isWeekend ? 'text-text-muted/30 cursor-not-allowed'
+                : isToday ? 'bg-bg-elevated text-text-primary font-bold'
+                : 'text-text-secondary hover:bg-bg-hover'
               }`}
             >
               {day}

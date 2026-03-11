@@ -13,8 +13,8 @@ export function RouteGuard({ children, role }: RouteGuardProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-navy-50 flex items-center justify-center">
-        <Spinner text="Завантаження..." />
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+        <Spinner />
       </div>
     );
   }

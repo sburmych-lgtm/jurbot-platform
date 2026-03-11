@@ -13,7 +13,7 @@ interface TimeSlotsProps {
 export function TimeSlots({ date, selected, onSelect, busySlots = [] }: TimeSlotsProps) {
   const renderSlots = (slots: string[], label: string) => (
     <div>
-      <p className="text-sm font-medium text-navy-600 mb-2">{label}</p>
+      <p className="text-sm font-medium text-text-secondary mb-2">{label}</p>
       <div className="grid grid-cols-3 gap-2">
         {slots.map(t => {
           const busy = busySlots.includes(t);
@@ -23,10 +23,10 @@ export function TimeSlots({ date, selected, onSelect, busySlots = [] }: TimeSlot
               key={t}
               disabled={busy}
               onClick={() => onSelect(t)}
-              className={`py-3 rounded-xl text-sm font-medium transition ${
-                sel ? 'bg-gold-500 text-navy-900 shadow-md'
-                : busy ? 'bg-navy-100 text-navy-300 line-through cursor-not-allowed'
-                : 'bg-white border border-navy-100 text-navy-700 hover:border-gold-400'
+              className={`py-3 rounded-[14px] text-sm font-medium transition ${
+                sel ? 'bg-accent-teal text-bg-primary font-bold'
+                : busy ? 'bg-bg-tertiary text-text-muted/40 line-through cursor-not-allowed'
+                : 'bg-bg-card border border-border-default text-text-secondary hover:border-accent-teal'
               }`}
             >
               {t}
@@ -40,11 +40,11 @@ export function TimeSlots({ date, selected, onSelect, busySlots = [] }: TimeSlot
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-navy-900">Оберіть час</h2>
-        <span className="text-sm text-navy-500">{formatDateUk(date)}</span>
+        <h2 className="text-xl font-bold text-text-primary">\u041e\u0431\u0435\u0440\u0456\u0442\u044c \u0447\u0430\u0441</h2>
+        <span className="text-sm text-text-muted">{formatDateUk(date)}</span>
       </div>
-      {renderSlots(MORNING, 'Ранок')}
-      {renderSlots(AFTERNOON, 'День')}
+      {renderSlots(MORNING, '\u0420\u0430\u043d\u043e\u043a')}
+      {renderSlots(AFTERNOON, '\u0414\u0435\u043d\u044c')}
     </div>
   );
 }

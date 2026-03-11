@@ -1,6 +1,48 @@
 @import "tailwindcss";
 
 @theme {
+  /* ─── Background levels (dark theme) ─── */
+  --color-bg-primary: #050810;
+  --color-bg-secondary: #0a1020;
+  --color-bg-tertiary: #0f1830;
+  --color-bg-card: #141e38;
+  --color-bg-elevated: #1a2848;
+  --color-bg-hover: #1e2a48;
+
+  /* ─── Accent colors ─── */
+  --color-accent-teal: #00c8b4;
+  --color-accent-blue: #5b7cfa;
+  --color-accent-amber: #f0a030;
+  --color-accent-red: #ef4444;
+  --color-accent-green: #22c55e;
+
+  /* ─── Text colors ─── */
+  --color-text-primary: #f0f4ff;
+  --color-text-secondary: #a0aec0;
+  --color-text-muted: #6b7a90;
+  --color-text-accent: #00c8b4;
+
+  /* ─── Border colors ─── */
+  --color-border-default: #1e2a48;
+  --color-border-light: #2a3858;
+
+  /* ─── Semantic status ─── */
+  --color-status-active: #00c8b4;
+  --color-status-pending: #f0a030;
+  --color-status-urgent: #ef4444;
+  --color-status-completed: #22c55e;
+
+  /* ─── Border radius ─── */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+
+  /* ─── Fonts ─── */
+  --font-family-display: 'Instrument Serif', Georgia, serif;
+  --font-family-sans: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+
+  /* ─── Legacy palette (backward compat) ─── */
   --color-navy-50: #f0f3f9;
   --color-navy-100: #dce3f0;
   --color-navy-200: #b8c7e1;
@@ -21,11 +63,54 @@
   --color-gold-700: #9c5f11;
   --color-gold-800: #804b15;
   --color-gold-900: #6d3e18;
-  --font-family-sans: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-body {
+/* ─── Base styles ─── */
+html, body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
   font-family: var(--font-family-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  overscroll-behavior: none;
+}
+
+/* Telegram safe area padding */
+body {
+  padding-top: env(safe-area-inset-top, 0);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* ─── Animations ─── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.3s ease-out;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 1.8s ease-in-out infinite;
+}
+
+/* ─── Scrollbar (minimal for mobile) ─── */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-light);
+  border-radius: 2px;
 }

@@ -1,51 +1,61 @@
 import { useState, useEffect } from 'react';
 import { FileText, Sparkles, ArrowLeft } from 'lucide-react';
+import { api } from '@/lib/api';
 import { PageContainer } from '@/components/layout/PageContainer';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { DocumentCard } from '@/components/documents/DocumentCard';
 import { TemplateCard } from '@/components/documents/TemplateCard';
 import { DynamicForm } from '@/components/documents/DynamicForm';
 import { DocumentPreview } from '@/components/documents/DocumentPreview';
-import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Spinner } from '@/components/ui/Spinner';
-import { api } from '@/lib/api';
-import { TEMPLATES, type DocumentTemplate } from '@jurbot/shared';
+import type { DocumentTemplate } from '@jurbot/shared';
+
+type ViewState = 'list' | 'templates' | 'form' | 'generating' | 'preview';
 
 interface DocItem {
   id: string;
   name: string;
+  type: string;
   status: string;
   createdAt: string;
-  size?: string;
 }
 
-type View = 'list' | 'templates' | 'form' | 'generating' | 'preview';
-
 export function LawyerDocumentsPage() {
-  const [view, setView] = useState<View>('list');
+  const [view, setView] = useState<ViewState>('list');
   const [docs, setDocs] = useState<DocItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<DocumentTemplate | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
         const res = await api.get<DocItem[]>('/v1/documents');
         setDocs(res.data ?? []);
-      } catch { setDocs([]); }
-      finally { setLoading(false); }
+      } catch {}
+      setLoading(false);
     })();
   }, []);
 
-  const handleSelectTemplate = (t: DocumentTemplate) => {
+  const loadTemplates = async () => {
+    try {
+      const res = await api.get<DocumentTemplate[]>('/v1/documents/templates');
+      setTemplates(res.data ?? []);
+    } catch {}
+    setView('templates');
+  };
+
+  const selectTemplate = (t: DocumentTemplate) => {
     setSelectedTemplate(t);
     setFormValues({});
     setView('form');
   };
 
-  const handleGenerate = async () => {
+  const generate = async () => {
     if (!selectedTemplate) return;
     setView('generating');
     try {
@@ -53,27 +63,28 @@ export function LawyerDocumentsPage() {
         templateId: selectedTemplate.id,
         data: formValues,
       });
-      setPreview(res.data?.content ?? 'Документ згенеровано');
+      setPreview(res.data?.content ?? '');
       setView('preview');
     } catch {
-      setPreview('Помилка генерації документа. Спробуйте ще раз.');
-      setView('preview');
+      setView('form');
     }
   };
+
+  if (loading) return <Spinner />;
 
   if (view === 'templates') {
     return (
       <PageContainer>
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <button onClick={() => setView('list')} className="p-2 rounded-lg hover:bg-navy-100">
-              <ArrowLeft size={20} className="text-navy-600" />
+            <button onClick={() => setView('list')} className="p-1.5 rounded-[10px] hover:bg-bg-hover">
+              <ArrowLeft size={20} className="text-text-secondary" />
             </button>
-            <h1 className="text-xl font-bold text-navy-900">Шаблони документів</h1>
+            <h1 className="text-xl font-bold text-text-primary">\u0428\u0430\u0431\u043b\u043e\u043d\u0438</h1>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            {TEMPLATES.map(t => (
-              <TemplateCard key={t.id} template={t} onClick={() => handleSelectTemplate(t)} />
+            {templates.map(t => (
+              <TemplateCard key={t.id} template={t} onClick={() => selectTemplate(t)} />
             ))}
           </div>
         </div>
@@ -86,21 +97,15 @@ export function LawyerDocumentsPage() {
       <PageContainer>
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <button onClick={() => setView('templates')} className="p-2 rounded-lg hover:bg-navy-100">
-              <ArrowLeft size={20} className="text-navy-600" />
+            <button onClick={() => setView('templates')} className="p-1.5 rounded-[10px] hover:bg-bg-hover">
+              <ArrowLeft size={20} className="text-text-secondary" />
             </button>
-            <div>
-              <h1 className="text-lg font-bold text-navy-900">{selectedTemplate.name}</h1>
-              <p className="text-xs text-navy-400">{selectedTemplate.description}</p>
-            </div>
+            <h1 className="text-xl font-bold text-text-primary">{selectedTemplate.name}</h1>
           </div>
-          <DynamicForm
-            template={selectedTemplate}
-            values={formValues}
-            onChange={(field, value) => setFormValues(prev => ({ ...prev, [field]: value }))}
-          />
-          <Button onClick={handleGenerate} className="w-full" size="lg">
-            <Sparkles size={18} /> Згенерувати документ
+          <DynamicForm template={selectedTemplate} values={formValues} onChange={(f, v) => setFormValues(p => ({ ...p, [f]: v }))} />
+          <Button size="lg" className="w-full" onClick={generate}>
+            <Sparkles size={18} />
+            \u0417\u0433\u0435\u043d\u0435\u0440\u0443\u0432\u0430\u0442\u0438
           </Button>
         </div>
       </PageContainer>
@@ -108,11 +113,7 @@ export function LawyerDocumentsPage() {
   }
 
   if (view === 'generating') {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <Spinner text="AI генерує документ..." subtext="Аналіз даних та формування тексту" />
-      </div>
-    );
+    return <Spinner text="\u0413\u0435\u043d\u0435\u0440\u0430\u0446\u0456\u044f \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0443..." subtext="AI \u043f\u0440\u0430\u0446\u044e\u0454" />;
   }
 
   if (view === 'preview') {
@@ -120,52 +121,43 @@ export function LawyerDocumentsPage() {
       <PageContainer>
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <button onClick={() => setView('list')} className="p-2 rounded-lg hover:bg-navy-100">
-              <ArrowLeft size={20} className="text-navy-600" />
+            <button onClick={() => setView('list')} className="p-1.5 rounded-[10px] hover:bg-bg-hover">
+              <ArrowLeft size={20} className="text-text-secondary" />
             </button>
-            <h1 className="text-lg font-bold text-navy-900">{selectedTemplate?.name ?? 'Документ'}</h1>
+            <h1 className="text-xl font-bold text-text-primary">\u041f\u0435\u0440\u0435\u0433\u043b\u044f\u0434</h1>
           </div>
           <DocumentPreview content={preview} />
-          <div className="flex gap-3">
-            <Button variant="secondary" className="flex-1" onClick={() => setView('form')}>Редагувати</Button>
-            <Button className="flex-1" onClick={() => setView('list')}>Зберегти</Button>
-          </div>
+          <Button size="lg" className="w-full" onClick={() => setView('list')}>
+            \u0417\u0431\u0435\u0440\u0435\u0433\u0442\u0438
+          </Button>
         </div>
       </PageContainer>
     );
   }
 
-  // Default: list view
   return (
     <PageContainer>
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-navy-900">Документи</h1>
-          <Button size="sm" onClick={() => setView('templates')}>
-            <Sparkles size={14} /> Створити
+          <h1 className="text-xl font-bold text-text-primary">AI \u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0438</h1>
+          <Button size="sm" onClick={loadTemplates}>
+            <Sparkles size={16} />
+            \u0421\u0442\u0432\u043e\u0440\u0438\u0442\u0438
           </Button>
         </div>
 
-        {loading ? (
-          <Spinner />
-        ) : docs.length === 0 ? (
+        {docs.length === 0 ? (
           <EmptyState
             icon={FileText}
-            title="Документів немає"
-            description="Створіть документ з шаблону"
-            actionLabel="Обрати шаблон"
-            onAction={() => setView('templates')}
+            title="\u0414\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0456\u0432 \u043d\u0435\u043c\u0430\u0454"
+            description="\u0421\u0442\u0432\u043e\u0440\u0456\u0442\u044c \u043f\u0435\u0440\u0448\u0438\u0439 AI-\u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442"
+            actionLabel="\u0421\u0442\u0432\u043e\u0440\u0438\u0442\u0438"
+            onAction={loadTemplates}
           />
         ) : (
           <div className="space-y-3">
             {docs.map(d => (
-              <DocumentCard
-                key={d.id}
-                name={d.name}
-                status={d.status}
-                date={d.createdAt}
-                size={d.size}
-              />
+              <DocumentCard key={d.id} name={d.name} status={d.status} date={d.createdAt} />
             ))}
           </div>
         )}

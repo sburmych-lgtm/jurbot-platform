@@ -45,20 +45,20 @@ export function ChatWindow({ messages, currentUserId, onSend, loading }: ChatWin
         ))}
         <div ref={endRef} />
       </div>
-      <div className="flex gap-2 pt-2 border-t border-navy-100">
+      <div className="flex gap-2 pt-2 border-t border-border-default">
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
-          placeholder="Написати повідомлення..."
-          className="flex-1 px-4 py-3 rounded-xl border-2 border-navy-100 bg-white focus:border-gold-400 focus:outline-none text-sm"
+          placeholder="\u041d\u0430\u043f\u0438\u0441\u0430\u0442\u0438 \u043f\u043e\u0432\u0456\u0434\u043e\u043c\u043b\u0435\u043d\u043d\u044f..."
+          className="flex-1 px-4 py-3 rounded-[14px] border border-border-default bg-bg-tertiary text-text-primary focus:border-accent-teal focus:outline-none text-sm"
           onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
           disabled={loading}
         />
         <button
           onClick={handleSend}
           disabled={!input.trim() || loading}
-          className={`w-12 h-12 rounded-xl flex items-center justify-center transition ${
-            input.trim() ? 'bg-gold-500 text-navy-900' : 'bg-navy-100 text-navy-300'
+          className={`w-12 h-12 rounded-[14px] flex items-center justify-center transition ${
+            input.trim() ? 'bg-accent-teal text-bg-primary' : 'bg-bg-elevated text-text-muted'
           }`}
         >
           <Send size={18} />

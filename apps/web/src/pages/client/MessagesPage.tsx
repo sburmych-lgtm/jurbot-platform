@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { MessageSquare } from 'lucide-react';
+import { useAuth } from '@/lib/auth';
+import { api } from '@/lib/api';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { ChatWindow } from '@/components/chat/ChatWindow';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Spinner } from '@/components/ui/Spinner';
-import { useAuth } from '@/lib/auth';
-import { api } from '@/lib/api';
 
-interface Message {
+interface Msg {
   id: string;
   text: string;
   senderId: string;
@@ -17,54 +17,42 @@ interface Message {
 
 export function MessagesPage() {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Msg[]>([]);
   const [caseId, setCaseId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        // Get first case, then its messages
         const casesRes = await api.get<{ id: string }[]>('/v1/cases');
-        const firstCase = casesRes.data?.[0];
-        if (firstCase) {
-          setCaseId(firstCase.id);
-          const msgsRes = await api.get<Message[]>(`/v1/cases/${firstCase.id}/messages`);
-          setMessages(msgsRes.data ?? []);
+        const cases = casesRes.data ?? [];
+        if (cases.length > 0) {
+          const first = cases[0];
+          if (!first) { setLoading(false); return; }
+          const id = first.id;
+          setCaseId(id);
+          const msgRes = await api.get<Msg[]>(`/v1/cases/${id}/messages`);
+          setMessages(msgRes.data ?? []);
         }
-      } catch { /* ignore */ }
-      finally { setLoading(false); }
+      } catch {}
+      setLoading(false);
     })();
   }, []);
 
-  const handleSend = async (text: string) => {
-    if (!caseId || !user) return;
+  const sendMessage = async (text: string) => {
+    if (!caseId) return;
     try {
-      const res = await api.post<Message>(`/v1/cases/${caseId}/messages`, { text });
-      if (res.data) {
-        setMessages(prev => [...prev, res.data!]);
-      }
-    } catch { /* ignore */ }
+      const res = await api.post<Msg>(`/v1/cases/${caseId}/messages`, { text });
+      if (res.data) setMessages(prev => [...prev, res.data!]);
+    } catch {}
   };
 
   if (loading) return <Spinner />;
-
-  if (!caseId) {
-    return (
-      <PageContainer>
-        <EmptyState icon={MessageSquare} title="Немає активних чатів" description="Чат стане доступний після створення справи" />
-      </PageContainer>
-    );
-  }
+  if (!caseId) return <EmptyState icon={MessageSquare} title="\u041d\u0435\u043c\u0430\u0454 \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0457 \u0441\u043f\u0440\u0430\u0432\u0438" />;
 
   return (
     <PageContainer>
-      <h1 className="text-xl font-bold text-navy-900 mb-3">Повідомлення</h1>
-      <ChatWindow
-        messages={messages}
-        currentUserId={user?.id ?? ''}
-        onSend={handleSend}
-      />
+      <ChatWindow messages={messages} currentUserId={user?.id ?? ''} onSend={sendMessage} />
     </PageContainer>
   );
 }

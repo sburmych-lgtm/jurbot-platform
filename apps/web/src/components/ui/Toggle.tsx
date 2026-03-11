@@ -10,7 +10,7 @@ interface ToggleProps {
 export function Toggle({ checked, onChange, label, className }: ToggleProps) {
   return (
     <label className={cn('flex items-center justify-between cursor-pointer', className)}>
-      {label && <span className="text-sm text-navy-600">{label}</span>}
+      {label && <span className="text-sm text-text-secondary">{label}</span>}
       <button
         type="button"
         role="switch"
@@ -18,7 +18,7 @@ export function Toggle({ checked, onChange, label, className }: ToggleProps) {
         onClick={() => onChange(!checked)}
         className={cn(
           'w-11 h-6 rounded-full transition relative',
-          checked ? 'bg-gold-500' : 'bg-navy-200',
+          checked ? 'bg-accent-teal' : 'bg-bg-elevated',
         )}
       >
         <div

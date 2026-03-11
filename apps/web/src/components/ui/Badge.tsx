@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 
-type BadgeColor = 'green' | 'yellow' | 'red' | 'blue' | 'gray' | 'orange' | 'purple';
+type BadgeColor = 'green' | 'yellow' | 'red' | 'blue' | 'gray' | 'orange' | 'purple' | 'teal';
 
 interface BadgeProps {
   children: React.ReactNode;
@@ -9,18 +9,19 @@ interface BadgeProps {
 }
 
 const colorClasses: Record<BadgeColor, string> = {
-  green: 'bg-green-100 text-green-700',
-  yellow: 'bg-yellow-100 text-yellow-700',
-  red: 'bg-red-100 text-red-700',
-  blue: 'bg-blue-100 text-blue-700',
-  gray: 'bg-navy-100 text-navy-500',
-  orange: 'bg-orange-100 text-orange-700',
-  purple: 'bg-purple-100 text-purple-700',
+  green: 'bg-accent-green/15 text-accent-green',
+  yellow: 'bg-accent-amber/15 text-accent-amber',
+  red: 'bg-accent-red/15 text-accent-red',
+  blue: 'bg-accent-blue/15 text-accent-blue',
+  gray: 'bg-bg-elevated text-text-muted',
+  orange: 'bg-accent-amber/15 text-accent-amber',
+  purple: 'bg-purple-500/15 text-purple-400',
+  teal: 'bg-accent-teal/15 text-accent-teal',
 };
 
 export function Badge({ children, color = 'gray', className }: BadgeProps) {
   return (
-    <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', colorClasses[color], className)}>
+    <span className={cn('text-xs px-2.5 py-1 rounded-full font-medium', colorClasses[color], className)}>
       {children}
     </span>
   );

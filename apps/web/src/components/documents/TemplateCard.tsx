@@ -10,13 +10,13 @@ export function TemplateCard({ template, onClick }: TemplateCardProps) {
   return (
     <button
       onClick={onClick}
-      className="bg-white rounded-xl p-4 text-left shadow-sm hover:shadow-md transition border border-navy-100 active:scale-[0.98]"
+      className="bg-bg-card rounded-[14px] p-4 text-left border border-border-default hover:border-accent-teal/50 transition active:scale-[0.98]"
     >
-      <div className="w-10 h-10 rounded-lg bg-navy-100 text-navy-600 flex items-center justify-center mb-3">
+      <div className="w-10 h-10 rounded-[10px] bg-accent-blue/15 text-accent-blue flex items-center justify-center mb-3">
         <FileText size={20} />
       </div>
-      <h3 className="font-semibold text-sm text-navy-800">{template.name}</h3>
-      <p className="text-xs text-navy-400 mt-1">{template.description}</p>
+      <h3 className="font-semibold text-sm text-text-primary">{template.name}</h3>
+      <p className="text-xs text-text-muted mt-1">{template.description}</p>
     </button>
   );
 }

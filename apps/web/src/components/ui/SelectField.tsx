@@ -14,7 +14,7 @@ interface SelectFieldProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>,
 export function SelectField({ icon: Icon, label, error, options, placeholder, onChange, className, value, ...props }: SelectFieldProps) {
   return (
     <div className={className}>
-      <label className="text-sm font-medium text-navy-700 flex items-center gap-2 mb-1">
+      <label className="text-sm font-medium text-text-secondary flex items-center gap-2 mb-1">
         {Icon && <Icon size={16} />}
         {label}
       </label>
@@ -22,8 +22,8 @@ export function SelectField({ icon: Icon, label, error, options, placeholder, on
         value={value}
         onChange={e => onChange?.(e.target.value)}
         className={cn(
-          'w-full px-4 py-3 rounded-xl border-2 bg-white text-navy-900 focus:outline-none transition',
-          error ? 'border-red-300 focus:border-red-400' : 'border-navy-100 focus:border-gold-400',
+          'w-full px-4 py-3 rounded-[14px] border border-border-default bg-bg-tertiary text-text-primary focus:outline-none focus:border-accent-teal transition',
+          error && 'border-accent-red focus:border-accent-red',
         )}
         {...props}
       >
@@ -32,7 +32,7 @@ export function SelectField({ icon: Icon, label, error, options, placeholder, on
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+      {error && <p className="text-accent-red text-xs mt-1">{error}</p>}
     </div>
   );
 }

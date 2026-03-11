@@ -12,9 +12,9 @@ interface EmptyStateProps {
 export function EmptyState({ icon: Icon, title, description, actionLabel, onAction }: EmptyStateProps) {
   return (
     <div className="text-center py-12">
-      <Icon size={48} className="mx-auto text-navy-200 mb-3" />
-      <p className="text-navy-500 font-medium">{title}</p>
-      {description && <p className="text-navy-300 text-sm mt-1">{description}</p>}
+      <Icon size={48} className="mx-auto text-text-muted/50 mb-3" />
+      <p className="text-text-secondary font-medium">{title}</p>
+      {description && <p className="text-text-muted text-sm mt-1">{description}</p>}
       {actionLabel && onAction && (
         <Button variant="primary" size="sm" className="mt-4" onClick={onAction}>
           {actionLabel}

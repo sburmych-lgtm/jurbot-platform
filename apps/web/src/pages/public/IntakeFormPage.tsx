@@ -1,246 +1,121 @@
 import { useState } from 'react';
-import {
-  Heart, Scale, Building2, Shield, Plane, Home, Briefcase, FileText,
-  ChevronRight, ChevronLeft, Check, Upload, Phone, Mail, MapPin, User,
-  AlertCircle, Clock, Star,
-} from 'lucide-react';
-import { ProgressSteps } from '@/components/ui/ProgressSteps';
-import { InputField } from '@/components/ui/InputField';
-import { Accordion } from '@/components/ui/Accordion';
-import { SummaryRow } from '@/components/ui/SummaryRow';
-import { Button } from '@/components/ui/Button';
-import { CATEGORIES, CITIES, URGENCY_OPTIONS, FAQ_ITEMS } from '@jurbot/shared';
+import { Scale, Check } from 'lucide-react';
 import { api } from '@/lib/api';
-import type { LucideIcon } from 'lucide-react';
+import { InputField } from '@/components/ui/InputField';
+import { TextareaField } from '@/components/ui/TextareaField';
+import { Button } from '@/components/ui/Button';
+import { ProgressSteps } from '@/components/ui/ProgressSteps';
 
-const ICON_MAP: Record<string, LucideIcon> = {
-  Heart, Scale, Building2, Shield, Plane, Home, Briefcase, FileText,
-};
+const CATEGORIES = [
+  { value: 'FAMILY', label: '\u0421\u0456\u043c\u0435\u0439\u043d\u0435' },
+  { value: 'CIVIL', label: '\u0426\u0438\u0432\u0456\u043b\u044c\u043d\u0435' },
+  { value: 'COMMERCIAL', label: '\u0413\u043e\u0441\u043f\u043e\u0434\u0430\u0440\u0441\u044c\u043a\u0435' },
+  { value: 'CRIMINAL', label: '\u041a\u0440\u0438\u043c\u0456\u043d\u0430\u043b\u044c\u043d\u0435' },
+  { value: 'LABOR', label: '\u0422\u0440\u0443\u0434\u043e\u0432\u0435' },
+  { value: 'OTHER', label: '\u0406\u043d\u0448\u0435' },
+];
 
-const INITIAL = { category: '', name: '', phone: '', email: '', city: '', description: '', urgency: '', fileName: '' };
-type FormData = typeof INITIAL;
+const URGENCY = [
+  { value: 'LOW', label: '\u041d\u0438\u0437\u044c\u043a\u0430' },
+  { value: 'MEDIUM', label: '\u0421\u0435\u0440\u0435\u0434\u043d\u044f' },
+  { value: 'HIGH', label: '\u0412\u0438\u0441\u043e\u043a\u0430' },
+];
 
 export function IntakeFormPage() {
   const [step, setStep] = useState(1);
-  const [data, setData] = useState<FormData>(INITIAL);
-  const [errors, setErrors] = useState<Partial<FormData>>({});
-  const [agreed, setAgreed] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [city, setCity] = useState('');
+  const [category, setCategory] = useState('');
+  const [urgency, setUrgency] = useState('MEDIUM');
+  const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
-  const [caseNum, setCaseNum] = useState('');
+  const [done, setDone] = useState(false);
 
-  const validate = (): boolean => {
-    const e: Partial<FormData> = {};
-    if (step === 1 && !data.category) return false;
-    if (step === 2) {
-      if (!data.name.trim()) e.name = "Введіть ПІБ";
-      if (!data.phone.trim() || data.phone.replace(/\D/g, '').length < 10) e.phone = "Введіть коректний телефон";
-      if (!data.email.includes('@')) e.email = "Введіть коректний email";
-      if (!data.city) e.city = "Оберіть місто";
-    }
-    if (step === 3) {
-      if (data.description.length < 20) e.description = "Мінімум 20 символів";
-      if (!data.urgency) e.urgency = "Оберіть терміновість";
-    }
-    if (step === 4 && !agreed) return false;
-    setErrors(e);
-    return Object.keys(e).length === 0;
+  const submit = async () => {
+    setLoading(true);
+    try {
+      await api.post('/v1/intake', { name, email, phone, city, category, urgency, description });
+      setDone(true);
+    } catch {}
+    setLoading(false);
   };
 
-  const next = async () => {
-    if (!validate()) return;
-    if (step === 4) {
-      setLoading(true);
-      try {
-        const res = await api.post<{ caseNumber: string }>('/v1/intake', {
-          category: data.category,
-          urgency: data.urgency,
-          description: data.description,
-          name: data.name,
-          phone: data.phone,
-          email: data.email,
-          city: data.city,
-        });
-        setCaseNum(res.data?.caseNumber ?? 'INQ-2026-' + String(Math.floor(1000 + Math.random() * 9000)));
-      } catch {
-        setCaseNum('INQ-2026-' + String(Math.floor(1000 + Math.random() * 9000)));
-      }
-      setLoading(false);
-      setStep(5);
-    } else {
-      setStep(s => s + 1);
-    }
-  };
-
-  const reset = () => { setStep(1); setData(INITIAL); setErrors({}); setAgreed(false); };
-
-  const cat = CATEGORIES.find(c => c.id === data.category);
-  const urg = URGENCY_OPTIONS.find(u => u.id === data.urgency);
+  if (done) {
+    return (
+      <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center p-6">
+        <div className="w-16 h-16 bg-accent-green/15 rounded-full flex items-center justify-center mb-4">
+          <Check size={32} className="text-accent-green" />
+        </div>
+        <h1 className="text-xl font-bold text-text-primary">\u0417\u0430\u044f\u0432\u043a\u0443 \u043d\u0430\u0434\u0456\u0441\u043b\u0430\u043d\u043e!</h1>
+        <p className="text-text-muted text-sm mt-2 text-center">\u0410\u0434\u0432\u043e\u043a\u0430\u0442 \u0437\u0432'\u044f\u0436\u0435\u0442\u044c\u0441\u044f \u0437 \u0432\u0430\u043c\u0438</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-navy-50">
-      {/* Header */}
-      <div className="bg-navy-900 text-white px-4 py-3 sticky top-0 z-50">
-        <div className="max-w-md mx-auto">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-lg font-bold flex items-center gap-2">
-                <Scale size={20} className="text-gold-400" /> ЮрБот
-              </h1>
-              <p className="text-navy-300 text-xs">Прийом клієнтів</p>
-            </div>
-            {step < 5 && <span className="text-navy-300 text-sm">Крок {step}/4</span>}
-          </div>
-          {step < 5 && <div className="mt-2"><ProgressSteps total={4} current={step} /></div>}
+    <div className="min-h-screen bg-bg-primary p-6">
+      <div className="max-w-sm mx-auto space-y-6">
+        <div className="text-center">
+          <Scale size={36} className="mx-auto text-accent-teal mb-2" />
+          <h1 className="text-xl font-bold text-text-primary">\u041d\u043e\u0432\u0430 \u0437\u0430\u044f\u0432\u043a\u0430</h1>
         </div>
-      </div>
 
-      <div className="max-w-md mx-auto px-4 py-6">
-        {/* Step 1: Category */}
+        <ProgressSteps total={3} current={step} />
+
         {step === 1 && (
-          <div className="space-y-3">
-            <h2 className="text-xl font-bold text-navy-900">Оберіть категорію справи</h2>
-            <p className="text-navy-500 text-sm">Це допоможе нам направити вас до потрібного спеціаліста</p>
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              {CATEGORIES.map(c => {
-                const Icon = ICON_MAP[c.icon] ?? FileText;
-                const selected = data.category === c.id;
-                return (
-                  <button key={c.id} onClick={() => setData({ ...data, category: c.id })}
-                    className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${
-                      selected ? 'border-gold-400 bg-gold-50 shadow-md scale-[1.02]' : 'border-navy-100 bg-white hover:border-navy-200 hover:shadow-sm'
-                    }`}>
-                    <Icon size={24} className={selected ? 'text-gold-600' : 'text-navy-400'} />
-                    <p className={`font-semibold text-sm mt-2 ${selected ? 'text-navy-900' : 'text-navy-700'}`}>{c.label}</p>
-                    <p className="text-xs text-navy-400 mt-0.5">{c.description}</p>
-                  </button>
-                );
-              })}
-            </div>
+          <div className="space-y-4">
+            <InputField label="\u0406\u043c'\u044f" value={name} onChange={setName} placeholder="\u0412\u0430\u0448\u0435 \u0456\u043c'\u044f" />
+            <InputField label="Email" type="email" value={email} onChange={setEmail} placeholder="email@example.com" />
+            <InputField label="\u0422\u0435\u043b\u0435\u0444\u043e\u043d" type="tel" value={phone} onChange={setPhone} placeholder="+380..." />
+            <InputField label="\u041c\u0456\u0441\u0442\u043e" value={city} onChange={setCity} placeholder="\u041a\u0438\u0457\u0432" />
+            <Button size="lg" className="w-full" onClick={() => setStep(2)} disabled={!name || !email}>\u0414\u0430\u043b\u0456</Button>
           </div>
         )}
 
-        {/* Step 2: Contact */}
         {step === 2 && (
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-navy-900">Контактні дані</h2>
-            <p className="text-navy-500 text-sm">Заповніть, щоб ми могли з вами зв'язатись</p>
-            <div className="space-y-3 mt-4">
-              <InputField icon={User} label="ПІБ" value={data.name} onChange={v => setData({ ...data, name: v })} error={errors.name} placeholder="Іванов Іван Іванович" />
-              <InputField icon={Phone} label="Телефон" value={data.phone} onChange={v => setData({ ...data, phone: v })} error={errors.phone} placeholder="+380 XX XXX XX XX" />
-              <InputField icon={Mail} label="Email" value={data.email} onChange={v => setData({ ...data, email: v })} error={errors.email} placeholder="email@example.com" type="email" />
-              <div>
-                <label className="text-sm font-medium text-navy-700 flex items-center gap-2 mb-1"><MapPin size={16} /> Місто</label>
-                <select value={data.city} onChange={e => setData({ ...data, city: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-navy-100 bg-white text-navy-900 focus:border-gold-400 focus:outline-none transition">
-                  <option value="">Оберіть місто</option>
-                  {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Description */}
-        {step === 3 && (
-          <div className="space-y-4">
-            <h2 className="text-xl font-bold text-navy-900">Опис проблеми</h2>
             <div>
-              <label className="text-sm font-medium text-navy-700 mb-1 block">Опишіть вашу ситуацію</label>
-              <textarea value={data.description} onChange={e => setData({ ...data, description: e.target.value })}
-                placeholder="Розкажіть детальніше про вашу юридичну проблему..."
-                className={`w-full px-4 py-3 rounded-xl border-2 bg-white text-navy-900 placeholder-navy-300 focus:outline-none transition min-h-[120px] resize-none ${
-                  errors.description ? 'border-red-300' : 'border-navy-100 focus:border-gold-400'
-                }`} />
-              {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description}</p>}
-              <p className="text-navy-400 text-xs mt-1">{data.description.length}/20 мін. символів</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-navy-700 mb-2 block">Терміновість</label>
-              <div className="space-y-2">
-                {URGENCY_OPTIONS.map(u => (
-                  <button key={u.id} onClick={() => setData({ ...data, urgency: u.id })}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition ${
-                      data.urgency === u.id ? 'border-gold-400 bg-gold-50' : 'border-navy-100 bg-white hover:border-navy-200'
-                    }`}>
-                    <span className={`w-3 h-3 rounded-full ${u.color === 'red' ? 'bg-red-500' : u.color === 'yellow' ? 'bg-yellow-500' : 'bg-green-500'}`} />
-                    <span className={`font-medium text-sm ${data.urgency === u.id ? 'text-navy-900' : 'text-navy-600'}`}>{u.label}</span>
-                    {data.urgency === u.id && <Check size={18} className="ml-auto text-gold-600" />}
+              <label className="text-sm font-medium text-text-secondary mb-2 block">\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0456\u044f</label>
+              <div className="flex flex-wrap gap-2">
+                {CATEGORIES.map(c => (
+                  <button
+                    key={c.value}
+                    onClick={() => setCategory(c.value)}
+                    className={`px-3 py-2 rounded-[10px] text-sm font-medium transition ${
+                      category === c.value ? 'bg-accent-teal text-bg-primary' : 'bg-bg-card border border-border-default text-text-secondary'
+                    }`}
+                  >
+                    {c.label}
                   </button>
                 ))}
               </div>
-              {errors.urgency && <p className="text-red-500 text-xs mt-1">{errors.urgency}</p>}
             </div>
             <div>
-              <label className="text-sm font-medium text-navy-700 mb-1 block">Прикріпити файл (опціонально)</label>
-              <div className="border-2 border-dashed border-navy-200 rounded-xl p-6 text-center bg-white hover:border-gold-400 transition cursor-pointer">
-                <Upload size={24} className="mx-auto text-navy-300 mb-2" />
-                <p className="text-sm text-navy-400">Натисніть для вибору файлу</p>
+              <label className="text-sm font-medium text-text-secondary mb-2 block">\u0422\u0435\u0440\u043c\u0456\u043d\u043e\u0432\u0456\u0441\u0442\u044c</label>
+              <div className="flex gap-2">
+                {URGENCY.map(u => (
+                  <button
+                    key={u.value}
+                    onClick={() => setUrgency(u.value)}
+                    className={`flex-1 py-2 rounded-[10px] text-sm font-medium transition ${
+                      urgency === u.value ? 'bg-accent-teal text-bg-primary' : 'bg-bg-card border border-border-default text-text-secondary'
+                    }`}
+                  >
+                    {u.label}
+                  </button>
+                ))}
               </div>
             </div>
+            <Button size="lg" className="w-full" onClick={() => setStep(3)} disabled={!category}>\u0414\u0430\u043b\u0456</Button>
           </div>
         )}
 
-        {/* Step 4: Confirm */}
-        {step === 4 && (
+        {step === 3 && (
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-navy-900">Підтвердження</h2>
-            <div className="bg-white rounded-xl border border-navy-100 p-4 space-y-3">
-              <SummaryRow label="Категорія" value={cat?.label} />
-              <SummaryRow label="ПІБ" value={data.name} />
-              <SummaryRow label="Телефон" value={data.phone} />
-              <SummaryRow label="Email" value={data.email} />
-              <SummaryRow label="Місто" value={data.city} />
-              <SummaryRow label="Терміновість" value={urg?.label} />
-              <SummaryRow label="Опис" value={data.description.length > 80 ? data.description.slice(0, 80) + '...' : data.description} />
-            </div>
-            <Accordion items={FAQ_ITEMS} title="Часті запитання" />
-            <label className="flex items-start gap-3 cursor-pointer mt-4">
-              <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)}
-                className="mt-1 w-5 h-5 rounded border-navy-300 accent-gold-500" />
-              <span className="text-sm text-navy-600">Я погоджуюсь з обробкою персональних даних відповідно до Закону України "Про захист персональних даних"</span>
-            </label>
-          </div>
-        )}
-
-        {/* Step 5: Success */}
-        {step === 5 && (
-          <div className="text-center space-y-6 py-8">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-              <Check size={40} className="text-green-600" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-navy-900">Заявку відправлено!</h2>
-              <p className="text-navy-500 mt-2">Номер звернення:</p>
-              <p className="text-2xl font-mono font-bold text-gold-600 mt-1">{caseNum}</p>
-            </div>
-            <div className="bg-white rounded-xl border border-navy-100 p-4 mx-4">
-              <p className="text-navy-600 text-sm flex items-center justify-center gap-1">
-                <Clock size={16} /> Ми зв'яжемось з вами найближчим часом
-              </p>
-            </div>
-            <Button onClick={reset} size="lg" className="w-full">
-              Повернутись на початок
-            </Button>
-          </div>
-        )}
-
-        {/* Navigation */}
-        {step < 5 && (
-          <div className="flex gap-3 mt-6">
-            {step > 1 && (
-              <Button variant="secondary" className="flex-1" onClick={() => { setStep(s => s - 1); setErrors({}); }}>
-                <ChevronLeft size={18} /> Назад
-              </Button>
-            )}
-            <Button
-              className="flex-1"
-              onClick={next}
-              loading={loading}
-              disabled={(step === 1 && !data.category) || (step === 4 && !agreed)}
-            >
-              {step === 4 ? 'Відправити заявку' : 'Далі'} <ChevronRight size={18} />
-            </Button>
+            <TextareaField label="\u041e\u043f\u0438\u0448\u0456\u0442\u044c \u0432\u0430\u0448\u0443 \u0441\u0438\u0442\u0443\u0430\u0446\u0456\u044e" value={description} onChange={setDescription} placeholder="\u0429\u043e \u0441\u0442\u0430\u043b\u043e\u0441\u044f?" />
+            <Button size="lg" className="w-full" loading={loading} onClick={submit} disabled={!description}>\u041d\u0430\u0434\u0456\u0441\u043b\u0430\u0442\u0438</Button>
           </div>
         )}
       </div>

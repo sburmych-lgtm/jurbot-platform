@@ -31,7 +31,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2">
         {toasts.map(t => (
-          <div key={t.id} className="bg-navy-900 text-white px-4 py-2 rounded-xl text-sm shadow-lg animate-[fadeIn_0.2s_ease-out]">
+          <div key={t.id} className="bg-bg-elevated text-text-primary px-4 py-2 rounded-[14px] text-sm shadow-lg border border-border-default animate-fade-up">
             {t.message}
           </div>
         ))}

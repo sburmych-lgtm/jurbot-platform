@@ -10,7 +10,7 @@ export function ProgressSteps({ total, current }: ProgressStepsProps) {
         <div
           key={i}
           className={`h-1 flex-1 rounded-full transition-all duration-500 ${
-            i < current ? 'bg-gold-400' : 'bg-navy-700'
+            i < current ? 'bg-accent-teal' : 'bg-bg-elevated'
           }`}
         />
       ))}

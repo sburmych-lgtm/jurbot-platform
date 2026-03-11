@@ -13,13 +13,13 @@ export function ProgressBar({ value, label, showPercent = true, className }: Pro
     <div className={className}>
       {(label || showPercent) && (
         <div className="flex items-center justify-between mb-1">
-          {label && <span className="text-sm font-medium text-navy-600">{label}</span>}
-          {showPercent && <span className="text-sm font-bold text-navy-800">{clamped}%</span>}
+          {label && <span className="text-sm font-medium text-text-secondary">{label}</span>}
+          {showPercent && <span className="text-sm font-bold text-text-primary">{clamped}%</span>}
         </div>
       )}
-      <div className="w-full bg-navy-100 rounded-full h-2">
+      <div className="w-full bg-bg-elevated rounded-full h-2">
         <div
-          className={cn('bg-gold-500 h-2 rounded-full transition-all duration-500')}
+          className={cn('bg-accent-teal h-2 rounded-full transition-all duration-500')}
           style={{ width: `${clamped}%` }}
         />
       </div>

@@ -11,15 +11,15 @@ export function MessageBubble({ text, time, isOwn, senderName }: MessageBubblePr
       <div
         className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
           isOwn
-            ? 'bg-navy-800 text-white rounded-br-md'
-            : 'bg-white border border-navy-100 text-navy-800 rounded-bl-md'
+            ? 'bg-accent-teal/20 text-text-primary rounded-br-md'
+            : 'bg-bg-card border border-border-default text-text-primary rounded-bl-md'
         }`}
       >
         {senderName && !isOwn && (
-          <p className="text-xs font-semibold text-gold-600 mb-1">{senderName}</p>
+          <p className="text-xs font-semibold text-accent-teal mb-1">{senderName}</p>
         )}
         <p className="text-sm">{text}</p>
-        <p className={`text-xs mt-1 ${isOwn ? 'text-navy-300' : 'text-navy-400'}`}>{time}</p>
+        <p className={`text-xs mt-1 ${isOwn ? 'text-text-muted' : 'text-text-muted'}`}>{time}</p>
       </div>
     </div>
   );

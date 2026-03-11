@@ -1,97 +1,67 @@
 import { useState, useEffect } from 'react';
-import { Bell, Check } from 'lucide-react';
+import { Bell } from 'lucide-react';
+import { api } from '@/lib/api';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Spinner } from '@/components/ui/Spinner';
-import { api } from '@/lib/api';
 
-interface NotificationItem {
+interface NotifItem {
   id: string;
   type: string;
   title: string;
-  body: string;
+  message: string;
   isRead: boolean;
-  link?: string;
   createdAt: string;
 }
 
-const typeColors: Record<string, 'blue' | 'green' | 'yellow' | 'orange' | 'gray'> = {
-  CASE_UPDATE: 'blue',
-  APPOINTMENT_REMINDER: 'yellow',
-  DOCUMENT_READY: 'green',
-  MESSAGE: 'orange',
-  SYSTEM: 'gray',
-};
-
 export function NotificationsPage() {
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [items, setItems] = useState<NotifItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.get<NotificationItem[]>('/v1/notifications');
-        setNotifications(res.data ?? []);
-      } catch { setNotifications([]); }
-      finally { setLoading(false); }
+        const res = await api.get<NotifItem[]>('/v1/notifications');
+        setItems(res.data ?? []);
+      } catch {}
+      setLoading(false);
     })();
   }, []);
 
   const markRead = async (id: string) => {
     try {
       await api.patch(`/v1/notifications/${id}/read`, {});
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-    } catch { /* ignore */ }
+      setItems(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    } catch {}
   };
 
-  const markAllRead = async () => {
-    try {
-      await api.post('/v1/notifications/read-all', {});
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-    } catch { /* ignore */ }
-  };
-
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  if (loading) return <Spinner />;
 
   return (
     <PageContainer>
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-navy-900">Сповіщення</h1>
-          {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={markAllRead}>
-              <Check size={14} /> Прочитати всі
-            </Button>
-          )}
-        </div>
-
-        {loading ? (
-          <Spinner />
-        ) : notifications.length === 0 ? (
-          <EmptyState icon={Bell} title="Сповіщень немає" description="Тут з'являтимуться оновлення по справах та записах" />
+        <h1 className="text-xl font-bold text-text-primary">\u0421\u043f\u043e\u0432\u0456\u0449\u0435\u043d\u043d\u044f</h1>
+        {items.length === 0 ? (
+          <EmptyState icon={Bell} title="\u041d\u0435\u043c\u0430\u0454 \u0441\u043f\u043e\u0432\u0456\u0449\u0435\u043d\u044c" />
         ) : (
           <div className="space-y-3">
-            {notifications.map(n => (
+            {items.map(n => (
               <Card
                 key={n.id}
-                className={n.isRead ? 'opacity-70' : 'border-l-4 border-l-gold-400'}
-                onClick={() => !n.isRead && markRead(n.id)}
+                className={`cursor-pointer ${!n.isRead ? 'border-accent-teal/30' : ''}`}
+                onClick={() => markRead(n.id)}
               >
                 <div className="flex items-start gap-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="text-sm font-semibold text-navy-800">{n.title}</p>
-                      <Badge color={typeColors[n.type] ?? 'gray'}>{n.type.replace('_', ' ')}</Badge>
-                    </div>
-                    <p className="text-sm text-navy-600">{n.body}</p>
-                    <p className="text-xs text-navy-400 mt-1">
+                  {!n.isRead && <div className="w-2 h-2 rounded-full bg-accent-teal mt-2 shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-text-primary">{n.title}</p>
+                    <p className="text-sm text-text-secondary mt-0.5 line-clamp-2">{n.message}</p>
+                    <p className="text-xs text-text-muted mt-1">
                       {new Date(n.createdAt).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
-                  {!n.isRead && <div className="w-2 h-2 bg-gold-500 rounded-full mt-2 shrink-0" />}
                 </div>
               </Card>
             ))}
