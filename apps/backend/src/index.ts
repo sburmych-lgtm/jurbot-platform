@@ -36,7 +36,7 @@ if (config.nodeEnv === 'production') {
   if (existsSync(indexHtml)) {
     app.use(express.static(webDist));
     // SPA fallback: serve index.html for non-API routes
-    app.get('*', (req, res, next) => {
+    app.get('{*path}', (req, res, next) => {
       if (req.path.startsWith('/api')) return next();
       res.sendFile(indexHtml);
     });
