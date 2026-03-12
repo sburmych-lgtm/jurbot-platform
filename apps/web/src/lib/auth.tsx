@@ -48,9 +48,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         // For Telegram: initData header is auto-attached by ApiClient
         // For JWT: tries the refresh cookie via /auth/me
-        const res = await api.get<{ user: AuthUser; accessToken?: string }>('/auth/me');
+        // /auth/me returns user directly: { success, data: { id, email, role, ... } }
+        // login/register return: { success, data: { user, accessToken } }
+        const res = await api.get<AuthUser & { user?: AuthUser; accessToken?: string }>('/auth/me');
         if (!cancelled && res.data) {
-          setAuth(res.data.user, res.data.accessToken ?? null);
+          // Handle both formats: wrapped { user, accessToken } and flat user object
+          const user = res.data.user ?? (res.data as unknown as AuthUser);
+          const token = res.data.accessToken ?? null;
+          if (user?.id) {
+            setAuth(user, token);
+          } else {
+            setAuth(null, null);
+          }
         }
       } catch {
         if (!cancelled) {

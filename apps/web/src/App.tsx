@@ -43,11 +43,18 @@ function HomeRedirect() {
   }
 
   if (!user) {
-    // In Telegram, show loading while auth resolves; outside, go to login
+    // In Telegram: auth already resolved (loading=false) but user not found
     if (isTelegramWebApp()) {
       return (
-        <div className="flex items-center justify-center min-h-screen bg-[#050810]">
-          <div className="text-[#a0aec0] text-lg">Авторизація через Telegram...</div>
+        <div className="flex flex-col items-center justify-center min-h-screen bg-[#050810] px-6 text-center">
+          <div className="text-4xl mb-4">⚖️</div>
+          <h1 className="text-white text-xl font-bold mb-2">ЮрБот</h1>
+          <p className="text-[#a0aec0] text-base mb-6">
+            Для доступу до Mini App спочатку пройдіть реєстрацію через бота.
+          </p>
+          <p className="text-[#64748b] text-sm">
+            Напишіть <span className="text-[#6c63ff] font-mono">/start</span> боту і завершіть реєстрацію.
+          </p>
         </div>
       );
     }
