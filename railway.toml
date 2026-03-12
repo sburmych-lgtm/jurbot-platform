@@ -1,5 +1,6 @@
 [build]
-buildCommand = "echo 'build-v2' && npx prisma generate --schema packages/db/prisma/schema.prisma && npm run build -w packages/shared && npm run build -w packages/db && npm run build -w packages/telegram && npm run build -w apps/web && npm run build -w apps/backend"
+# buildCommand removed — Railpack auto-runs "npm run build" from package.json
+# which already includes all workspace builds (shared, db, telegram, web, backend)
 
 [deploy]
 startCommand = "node apps/backend/dist/index.js"
