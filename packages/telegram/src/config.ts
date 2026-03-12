@@ -419,7 +419,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
     console.log(`[Lawyer Bot] /start from ${telegramId}, superadmin=${sa}`);
 
     const existing = await prisma.telegramIdentity.findFirst({
-      where: { telegramId },
+      where: { telegramId, botType: 'lawyer' },
       include: { user: true },
     });
 
@@ -749,7 +749,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
     const telegramId = BigInt(ctx.from!.id);
     const sa = isSuperadmin(telegramId, superadminTelegramId);
     const identity = await prisma.telegramIdentity.findFirst({
-      where: { telegramId },
+      where: { telegramId, botType: 'lawyer' },
       include: { user: { include: { lawyerProfile: true } } },
     });
 
@@ -838,7 +838,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
   bot.command('invite', async (ctx) => {
     const telegramId = BigInt(ctx.from!.id);
     const identity = await prisma.telegramIdentity.findFirst({
-      where: { telegramId },
+      where: { telegramId, botType: 'lawyer' },
       include: { user: { include: { lawyerProfile: true } } },
     });
 
@@ -858,7 +858,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
 
   bot.command('cases', async (ctx) => {
     const telegramId = BigInt(ctx.from!.id);
-    const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId } });
+    const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId, botType: 'lawyer' } });
     if (!identity) { await ctx.reply('Спочатку пройдіть реєстрацію: /start'); return; }
 
     const profile = await prisma.lawyerProfile.findUnique({ where: { userId: identity.userId } });
@@ -881,7 +881,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
 
   bot.command('schedule', async (ctx) => {
     const telegramId = BigInt(ctx.from!.id);
-    const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId } });
+    const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId, botType: 'lawyer' } });
     if (!identity) { await ctx.reply('Спочатку пройдіть реєстрацію: /start'); return; }
 
     const profile = await prisma.lawyerProfile.findUnique({ where: { userId: identity.userId } });
@@ -918,7 +918,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
   bot.callbackQuery('l:cases', async (ctx) => {
     await ctx.answerCallbackQuery();
     const telegramId = BigInt(ctx.from!.id);
-    const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId } });
+    const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId, botType: 'lawyer' } });
     if (!identity) return;
     const profile = await prisma.lawyerProfile.findUnique({ where: { userId: identity.userId } });
     if (!profile) return;
@@ -941,7 +941,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
   bot.callbackQuery('l:schedule', async (ctx) => {
     await ctx.answerCallbackQuery();
     const telegramId = BigInt(ctx.from!.id);
-    const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId } });
+    const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId, botType: 'lawyer' } });
     if (!identity) return;
     const profile = await prisma.lawyerProfile.findUnique({ where: { userId: identity.userId } });
     if (!profile) return;
@@ -972,7 +972,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
     await ctx.answerCallbackQuery();
     const telegramId = BigInt(ctx.from!.id);
     const identity = await prisma.telegramIdentity.findFirst({
-      where: { telegramId },
+      where: { telegramId, botType: 'lawyer' },
       include: { user: { include: { lawyerProfile: true } } },
     });
 
@@ -1004,7 +1004,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
   bot.callbackQuery('l:clients', async (ctx) => {
     await ctx.answerCallbackQuery();
     const telegramId = BigInt(ctx.from!.id);
-    const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId } });
+    const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId, botType: 'lawyer' } });
     if (!identity) return;
     const profile = await prisma.lawyerProfile.findUnique({ where: { userId: identity.userId } });
     if (!profile?.orgId) return;
@@ -1025,7 +1025,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
     const telegramId = BigInt(ctx.from!.id);
     const sa = isSuperadmin(telegramId, superadminTelegramId);
     const identity = await prisma.telegramIdentity.findFirst({
-      where: { telegramId },
+      where: { telegramId, botType: 'lawyer' },
       include: { user: { include: { lawyerProfile: true } } },
     });
     if (!identity) return;
@@ -1093,7 +1093,7 @@ export function createClientBot(opts: BotOptions): Bot {
     const startParam = ctx.match?.toString().trim();
 
     const existing = await prisma.telegramIdentity.findFirst({
-      where: { telegramId },
+      where: { telegramId, botType: 'client' },
       include: { user: true },
     });
 
@@ -1277,7 +1277,7 @@ export function createClientBot(opts: BotOptions): Bot {
 
       const telegramId = BigInt(ctx.from!.id);
       const identity = await prisma.telegramIdentity.findFirst({
-        where: { telegramId },
+        where: { telegramId, botType: 'client' },
         include: { user: true },
       });
 
@@ -1453,7 +1453,7 @@ export function createClientBot(opts: BotOptions): Bot {
     const telegramId = BigInt(ctx.from!.id);
     const sa = isSuperadmin(telegramId, superadminTelegramId);
     const identity = await prisma.telegramIdentity.findFirst({
-      where: { telegramId },
+      where: { telegramId, botType: 'client' },
       include: { user: { include: { clientProfile: true } } },
     });
 
@@ -1517,7 +1517,7 @@ export function createClientBot(opts: BotOptions): Bot {
 
   bot.command('status', async (ctx) => {
     const telegramId = BigInt(ctx.from!.id);
-    const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId } });
+    const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId, botType: 'client' } });
     if (!identity) { await ctx.reply('Спочатку пройдіть реєстрацію.'); return; }
 
     const profile = await prisma.clientProfile.findUnique({ where: { userId: identity.userId } });
@@ -1540,7 +1540,7 @@ export function createClientBot(opts: BotOptions): Bot {
 
   bot.command('appointments', async (ctx) => {
     const telegramId = BigInt(ctx.from!.id);
-    const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId } });
+    const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId, botType: 'client' } });
     if (!identity) { await ctx.reply('Спочатку пройдіть реєстрацію.'); return; }
 
     const profile = await prisma.clientProfile.findUnique({ where: { userId: identity.userId } });
@@ -1591,7 +1591,7 @@ export function createClientBot(opts: BotOptions): Bot {
   bot.callbackQuery('c:cases', async (ctx) => {
     await ctx.answerCallbackQuery();
     const telegramId = BigInt(ctx.from!.id);
-    const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId } });
+    const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId, botType: 'client' } });
     if (!identity) return;
     const profile = await prisma.clientProfile.findUnique({ where: { userId: identity.userId } });
     if (!profile) return;

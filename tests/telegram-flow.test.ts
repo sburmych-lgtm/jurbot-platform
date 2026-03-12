@@ -285,6 +285,37 @@ afterEach(() => {
 });
 
 describe('Telegram bot flows', () => {
+  it('does not treat a lawyer identity as an existing client account', async () => {
+    const { createClientBot } = await importTelegramConfig();
+
+    mockPrisma.telegramIdentity.findFirst.mockResolvedValue(null);
+
+    const bot = primeBot(
+      createClientBot({
+        token: 'client-token',
+        lawyerBotToken: 'lawyer-token',
+        miniAppUrl: 'https://app.example.com',
+      }),
+      'YurBotClientBot',
+    );
+
+    await bot.handleUpdate(commandUpdate('/start', 963610407, 'superadmin_user'));
+
+    expect(mockPrisma.telegramIdentity.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          telegramId: BigInt(963610407),
+          botType: 'client',
+        }),
+      }),
+    );
+
+    const welcomeMessage = telegramApiCalls.find(
+      (call) => call.method === 'sendMessage' && String(call.body.text).includes('потрібне посилання від адвоката'),
+    );
+    expect(welcomeMessage?.body.text).toContain('потрібне посилання від адвоката');
+  });
+
   it('registers a lawyer via friendly onboarding and returns an invite link', async () => {
     const { createLawyerBot } = await importTelegramConfig();
 
