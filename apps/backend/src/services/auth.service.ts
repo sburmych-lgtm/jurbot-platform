@@ -87,6 +87,9 @@ export async function getMe(userId: string) {
     throw new AppError(404, 'Користувача не знайдено');
   }
 
-  const { password: _, ...userWithoutPassword } = user;
-  return userWithoutPassword;
+  const { password: _, telegramId, ...userWithoutPassword } = user;
+  return {
+    ...userWithoutPassword,
+    telegramId: telegramId?.toString() ?? null,
+  };
 }
