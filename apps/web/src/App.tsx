@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { RouteGuard } from '@/components/auth/RouteGuard';
 import { useAuth } from '@/lib/auth';
+import { isTelegramWebApp, getBotSource } from '@/lib/telegram';
 
 // Public pages
 import { LoginPage } from '@/pages/public/LoginPage';
@@ -41,8 +42,22 @@ function HomeRedirect() {
     );
   }
 
-  if (!user) return <Navigate to="/login" replace />;
-  if (user.role === 'LAWYER') return <Navigate to="/lawyer" replace />;
+  if (!user) {
+    // In Telegram, show loading while auth resolves; outside, go to login
+    if (isTelegramWebApp()) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-[#050810]">
+          <div className="text-[#a0aec0] text-lg">Авторизація через Telegram...</div>
+        </div>
+      );
+    }
+    return <Navigate to="/login" replace />;
+  }
+
+  // Route based on user role (DB source of truth)
+  // Bot source can override for superadmins who have both roles
+  const botSource = getBotSource();
+  if (user.role === 'LAWYER' || botSource === 'lawyer') return <Navigate to="/lawyer" replace />;
   return <Navigate to="/client" replace />;
 }
 

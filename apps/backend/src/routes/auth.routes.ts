@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { loginSchema, registerSchema, portalLoginSchema } from '@jurbot/shared';
 import { validate } from '../middleware/validate.js';
 import { authenticate } from '../middleware/auth.js';
+import { flexAuth } from '../middleware/telegramAuth.js';
 import * as authService from '../services/auth.service.js';
 import { authLimiter } from '../middleware/rateLimit.js';
 
@@ -55,7 +56,7 @@ authRouter.post('/portal-login', validate(portalLoginSchema), async (req, res, n
   }
 });
 
-authRouter.get('/me', authenticate, async (req, res, next) => {
+authRouter.get('/me', flexAuth, async (req, res, next) => {
   try {
     const user = await authService.getMe(req.user!.id);
     res.json({ success: true, data: user });

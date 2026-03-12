@@ -35,6 +35,25 @@ export function initTelegramApp() {
   }
 }
 
+/**
+ * Detect which bot opened the Mini App.
+ * Menu Button URL includes ?startapp=lawyer or ?startapp=client.
+ * The Telegram SDK exposes this via initDataUnsafe.start_param.
+ */
+export function getBotSource(): 'lawyer' | 'client' | null {
+  try {
+    const startParam = WebApp.initDataUnsafe?.start_param;
+    if (startParam === 'lawyer' || startParam === 'client') return startParam;
+
+    // Fallback: check URL search params (tgWebAppStartParam)
+    const urlParam = new URLSearchParams(window.location.search).get('tgWebAppStartParam');
+    if (urlParam === 'lawyer' || urlParam === 'client') return urlParam;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 /** Close the Mini App */
 export function closeMiniApp() {
   if (isTelegramWebApp()) {
