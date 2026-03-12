@@ -10,8 +10,10 @@ interface OnboardingSession {
     | 'awaiting_name'
     | 'awaiting_phone'
     | 'awaiting_specialization'
+    | 'awaiting_client_message'
     | 'awaiting_reset_confirm';
   name?: string;
+  phone?: string;
   specialties?: string[];
   tokenData?: { tokenId: string; orgId: string; lawyerId: string; caseId?: string };
 }
@@ -28,6 +30,13 @@ interface BotOptions {
 
 const PLACEHOLDER_TOKEN = 'PLACEHOLDER_PROVIDE_LATER';
 const TRIAL_DAYS = 14;
+const CLIENT_BOT_USERNAME = 'YurBotClientBot';
+const HTML_ESCAPE_MAP: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+};
 
 // Category labels for specialization picker
 const SPECIALIZATION_MAP: Record<string, string> = {
@@ -49,8 +58,20 @@ function initialSession(): OnboardingSession {
   return { step: 'idle' };
 }
 
+function resetSession(session: OnboardingSession): void {
+  session.step = 'idle';
+  delete session.name;
+  delete session.phone;
+  delete session.specialties;
+  delete session.tokenData;
+}
+
 function generateToken(prefix: string): string {
   return `${prefix}_${randomBytes(12).toString('base64url')}`;
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"]/g, (char) => HTML_ESCAPE_MAP[char] ?? char);
 }
 
 function slugify(name: string): string {
@@ -144,22 +165,15 @@ async function notifyLawyerAboutClient(
     });
     if (!lawyerIdentity) return;
 
+    const safeName = escapeHtml(clientName);
+    const safePhone = escapeHtml(clientPhone || '—');
     const text =
       '🔔 <b>Новий клієнт зареєструвався!</b>\n\n' +
-      `👤 Ім'я: ${clientName}\n` +
-      `📱 Телефон: ${clientPhone}\n\n` +
+      `👤 Ім'я: ${safeName}\n` +
+      `📱 Телефон: ${safePhone}\n\n` +
       '📱 Відкрийте Mini App для деталей.';
 
-    const url = `https://api.telegram.org/bot${lawyerBotToken}/sendMessage`;
-    await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: lawyerIdentity.chatId.toString(),
-        text,
-        parse_mode: 'HTML',
-      }),
-    });
+    const telegramSent = await sendTelegramHtmlMessage(lawyerBotToken, lawyerIdentity.chatId, text);
 
     // Create notification in DB
     await prisma.notification.create({
@@ -169,11 +183,55 @@ async function notifyLawyerAboutClient(
         type: 'NEW_CLIENT',
         title: 'Новий клієнт',
         body: `${clientName} зареєструвався через ваше запрошення.`,
-        telegramSent: true,
+        telegramSent,
       },
     });
   } catch (err) {
     console.error('[Notify] Failed to notify lawyer:', err);
+  }
+}
+
+async function notifyLawyerAboutClientMessage(
+  lawyerBotToken: string | undefined,
+  lawyerId: string,
+  clientName: string,
+  messageText: string,
+): Promise<void> {
+  if (!lawyerBotToken || isPlaceholderToken(lawyerBotToken)) return;
+
+  try {
+    const lawyerProfile = await prisma.lawyerProfile.findUnique({
+      where: { id: lawyerId },
+      include: { user: true },
+    });
+    if (!lawyerProfile) return;
+
+    const lawyerIdentity = await prisma.telegramIdentity.findFirst({
+      where: { userId: lawyerProfile.userId, botType: 'lawyer' },
+    });
+    if (!lawyerIdentity) return;
+
+    const safeName = escapeHtml(clientName);
+    const safeMessage = escapeHtml(messageText);
+    const text =
+      '💬 <b>Нове повідомлення від клієнта</b>\n\n' +
+      `👤 ${safeName}\n` +
+      `📝 ${safeMessage}`;
+
+    const telegramSent = await sendTelegramHtmlMessage(lawyerBotToken, lawyerIdentity.chatId, text);
+
+    await prisma.notification.create({
+      data: {
+        userId: lawyerProfile.userId,
+        orgId: lawyerProfile.orgId ?? undefined,
+        type: 'MESSAGE',
+        title: 'Нове повідомлення від клієнта',
+        body: `${clientName}: ${messageText}`,
+        telegramSent,
+      },
+    });
+  } catch (err) {
+    console.error('[Notify] Failed to forward client message:', err);
   }
 }
 
@@ -198,6 +256,105 @@ function buildSpecializationKeyboard(selected: string[]): InlineKeyboard {
   return kb;
 }
 
+function buildLawyerActionKeyboard(sa: boolean): InlineKeyboard {
+  const keyboard = new InlineKeyboard()
+    .text('📝 Нові заявки', 'l:intake')
+    .text('📋 Мої справи', 'l:cases').row()
+    .text('📅 Розклад', 'l:schedule')
+    .text('🔗 Запросити клієнта', 'l:invite').row()
+    .text('👥 Клієнти', 'l:clients')
+    .text('📄 AI Документи', 'l:docs').row()
+    .text('⚙️ Налаштування', 'l:settings');
+
+  if (sa) {
+    keyboard.row().text('🔧 Адмін панель', 'l:admin');
+  }
+
+  return keyboard;
+}
+
+function buildClientActionKeyboard(): InlineKeyboard {
+  return new InlineKeyboard()
+    .text('📝 Залишити заявку', 'c:intake')
+    .text('📅 Записатись', 'c:book').row()
+    .text('📋 Мої справи', 'c:cases')
+    .text('📎 Завантажити файл', 'c:upload').row()
+    .text('💬 Написати адвокату', 'c:msg')
+    .text('ℹ️ Про нас', 'c:about');
+}
+
+function buildClientInviteLink(token: string): string {
+  return `https://t.me/${CLIENT_BOT_USERNAME}?start=${token}`;
+}
+
+async function createClientInviteLink(lawyerId: string, orgId: string): Promise<string> {
+  const inviteToken = await prisma.inviteToken.create({
+    data: {
+      orgId,
+      lawyerId,
+      token: generateToken('inv'),
+      tokenType: 'PUBLIC_LAWYER',
+      expiresAt: new Date(Date.now() + 365 * 86400000),
+    },
+  });
+
+  return buildClientInviteLink(inviteToken.token);
+}
+
+async function sendTelegramHtmlMessage(
+  botToken: string | undefined,
+  chatId: bigint,
+  text: string,
+): Promise<boolean> {
+  if (!botToken || isPlaceholderToken(botToken)) return false;
+
+  try {
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId.toString(),
+        text,
+        parse_mode: 'HTML',
+      }),
+    });
+
+    return response.ok;
+  } catch (err) {
+    console.error('[Telegram Notify] Failed to send Telegram message:', err);
+    return false;
+  }
+}
+
+async function resolveLawyerForClient(userId: string) {
+  const clientProfile = await prisma.clientProfile.findUnique({
+    where: { userId },
+    include: {
+      sourceToken: {
+        include: {
+          lawyer: {
+            include: { user: true },
+          },
+        },
+      },
+    },
+  });
+
+  if (clientProfile?.sourceToken?.lawyer) {
+    return clientProfile.sourceToken.lawyer;
+  }
+
+  if (!clientProfile?.orgId) {
+    return null;
+  }
+
+  return prisma.lawyerProfile.findFirst({
+    where: { orgId: clientProfile.orgId },
+    include: { user: true },
+  });
+}
+
 // ─── Lawyer Dashboard Builder ────────────────────────────────
 async function buildLawyerDashboard(userId: string, sa: boolean) {
   const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
@@ -216,17 +373,7 @@ async function buildLawyerDashboard(userId: string, sa: boolean) {
     ]);
   }
 
-  const keyboard = new InlineKeyboard()
-    .text('📝 Нові заявки', 'l:intake')
-    .text('📋 Мої справи', 'l:cases').row()
-    .text('📅 Розклад', 'l:schedule')
-    .text('📄 AI Документи', 'l:docs').row()
-    .text('👥 Клієнти', 'l:clients')
-    .text('⚙️ Налаштування', 'l:settings').row();
-
-  if (sa) {
-    keyboard.text('🔧 Адмін панель', 'l:admin');
-  }
+  const keyboard = buildLawyerActionKeyboard(sa);
 
   const badge = sa ? ' 👑' : '';
   const text =
@@ -357,12 +504,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
 
       try {
         const result = await prisma.$transaction(async (tx) => {
-          // Phone was already saved to session at step awaiting_phone
-          // We stored it in ctx.session.name as "name" but phone is separate
-          // Actually we need to get phone from somewhere — let me check
-          // Phone should have been passed along. Let me use a different approach:
-          // We'll store phone in tokenData temporarily
-          const phone = (ctx.session.tokenData as unknown as { phone?: string })?.phone ?? '';
+          const phone = ctx.session.phone ?? '';
 
           const user = await tx.user.create({
             data: { name, phone, role: 'LAWYER', telegramId },
@@ -410,14 +552,14 @@ export function createLawyerBot(opts: BotOptions): Bot {
           return { user, org, profile, inviteToken };
         });
 
-        ctx.session.step = 'idle';
+        resetSession(ctx.session);
 
         const specialtiesText = specialties.map(s => SPECIALIZATION_MAP[s] ?? s).join(', ');
         const planMsg = sa
           ? '👑 SUPERADMIN — план BUREAU (без обмежень)'
           : '🎁 14-денний пробний період активовано';
 
-        const clientBotLink = `https://t.me/YurBotClientBot?start=${result.inviteToken.token}`;
+        const clientBotLink = buildClientInviteLink(result.inviteToken.token);
 
         await ctx.editMessageText(
           `<b>✅ Реєстрацію завершено!</b>\n` +
@@ -453,7 +595,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
         }
       } catch (err) {
         console.error('[Lawyer Bot] Registration error:', err);
-        ctx.session.step = 'idle';
+        resetSession(ctx.session);
         await ctx.reply('❌ Помилка при реєстрації. Спробуйте /start ще раз.');
       }
       return;
@@ -488,13 +630,17 @@ export function createLawyerBot(opts: BotOptions): Bot {
   bot.on('message:text', async (ctx) => {
     const { step } = ctx.session;
 
+    if (ctx.message.text.startsWith('/')) {
+      return;
+    }
+
     if (step === 'awaiting_reset_confirm') {
       const text = ctx.message.text.trim().toLowerCase();
       if (text === 'так' || text === 'yes') {
         const telegramId = BigInt(ctx.from!.id);
         try {
           const deleted = await deleteUserByTelegramId(telegramId);
-          ctx.session.step = 'idle';
+          resetSession(ctx.session);
           if (deleted) {
             await ctx.reply('🗑 Дані видалено. Натисніть /start для нової реєстрації.');
           } else {
@@ -502,11 +648,11 @@ export function createLawyerBot(opts: BotOptions): Bot {
           }
         } catch (err) {
           console.error('[Lawyer Bot] Reset error:', err);
-          ctx.session.step = 'idle';
+          resetSession(ctx.session);
           await ctx.reply('❌ Помилка при видаленні. Спробуйте ще раз.');
         }
       } else {
-        ctx.session.step = 'idle';
+        resetSession(ctx.session);
         await ctx.reply('Скасовано.');
       }
       return;
@@ -538,7 +684,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
       }
 
       // Store phone for later use in spec:done callback
-      ctx.session.tokenData = { phone } as unknown as OnboardingSession['tokenData'];
+      ctx.session.phone = phone;
       ctx.session.step = 'awaiting_specialization';
       ctx.session.specialties = [];
 
@@ -681,15 +827,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
     }
 
     const profile = identity.user.lawyerProfile;
-    const inviteToken = await prisma.inviteToken.create({
-      data: {
-        orgId: profile.orgId!, lawyerId: profile.id,
-        token: generateToken('inv'), tokenType: 'PUBLIC_LAWYER',
-        expiresAt: new Date(Date.now() + 365 * 86400000),
-      },
-    });
-
-    const link = `https://t.me/YurBotClientBot?start=${inviteToken.token}`;
+    const link = await createClientInviteLink(profile.id, profile.orgId!);
 
     await ctx.reply(
       '🔗 Посилання для клієнтів:\n\n' + link + '\n\n' +
@@ -809,6 +947,28 @@ export function createLawyerBot(opts: BotOptions): Bot {
     await ctx.reply('📅 Розклад на сьогодні:\n\n' + lines.join('\n'));
   });
 
+  bot.callbackQuery('l:invite', async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const telegramId = BigInt(ctx.from!.id);
+    const identity = await prisma.telegramIdentity.findFirst({
+      where: { telegramId },
+      include: { user: { include: { lawyerProfile: true } } },
+    });
+
+    if (!identity?.user.lawyerProfile?.orgId) {
+      await ctx.reply('Спочатку завершіть реєстрацію, щоб запросити клієнта.');
+      return;
+    }
+
+    const profile = identity.user.lawyerProfile;
+    const link = await createClientInviteLink(profile.id, profile.orgId!);
+    await ctx.reply(
+      '🔗 Готово! Надішліть це посилання клієнту:\n\n' +
+      link +
+      '\n\nПісля реєстрації клієнт автоматично прив’яжеться до вашого акаунта.',
+    );
+  });
+
   bot.callbackQuery('l:docs', async (ctx) => {
     await ctx.answerCallbackQuery();
     if (miniAppUrl) {
@@ -918,19 +1078,11 @@ export function createClientBot(opts: BotOptions): Bot {
 
     if (existing) {
       // Already registered — show client menu + Mini App
-      const keyboard = new InlineKeyboard()
-        .text('📝 Залишити заявку', 'c:intake')
-        .text('📅 Записатись', 'c:book').row()
-        .text('📋 Мої справи', 'c:cases')
-        .text('📎 Завантажити файл', 'c:upload').row()
-        .text('💬 Написати адвокату', 'c:msg')
-        .text('ℹ️ Про нас', 'c:about');
-
       await ctx.reply(
         `<b>👋 Ласкаво просимо до ЮрБот!</b>\n` +
         `━━━━━━━━━━━━━━━━━\n` +
         `Ваш цифровий юридичний асистент`,
-        { parse_mode: 'HTML', reply_markup: keyboard },
+        { parse_mode: 'HTML', reply_markup: buildClientActionKeyboard() },
       );
 
       if (miniAppUrl) {
@@ -1063,13 +1215,17 @@ export function createClientBot(opts: BotOptions): Bot {
   bot.on('message:text', async (ctx) => {
     const { step } = ctx.session;
 
+    if (ctx.message.text.startsWith('/')) {
+      return;
+    }
+
     if (step === 'awaiting_reset_confirm') {
       const text = ctx.message.text.trim().toLowerCase();
       if (text === 'так' || text === 'yes') {
         const telegramId = BigInt(ctx.from!.id);
         try {
           const deleted = await deleteUserByTelegramId(telegramId);
-          ctx.session.step = 'idle';
+          resetSession(ctx.session);
           if (deleted) {
             await ctx.reply('🗑 Дані видалено. Попросіть адвоката надіслати нове посилання.');
           } else {
@@ -1077,13 +1233,51 @@ export function createClientBot(opts: BotOptions): Bot {
           }
         } catch (err) {
           console.error('[Client Bot] Reset error:', err);
-          ctx.session.step = 'idle';
+          resetSession(ctx.session);
           await ctx.reply('❌ Помилка при видаленні.');
         }
       } else {
-        ctx.session.step = 'idle';
+        resetSession(ctx.session);
         await ctx.reply('Скасовано.');
       }
+      return;
+    }
+
+    if (step === 'awaiting_client_message') {
+      const messageText = ctx.message.text.trim();
+      if (messageText.length < 2) {
+        await ctx.reply('Напишіть, будь ласка, трохи детальніше, щоб я передав це адвокату.');
+        return;
+      }
+
+      const telegramId = BigInt(ctx.from!.id);
+      const identity = await prisma.telegramIdentity.findFirst({
+        where: { telegramId },
+        include: { user: true },
+      });
+
+      if (!identity) {
+        resetSession(ctx.session);
+        await ctx.reply('Спочатку завершіть реєстрацію через кнопку "Почати".');
+        return;
+      }
+
+      const lawyer = await resolveLawyerForClient(identity.userId);
+      if (!lawyer) {
+        resetSession(ctx.session);
+        await ctx.reply('Не вдалося знайти вашого адвоката. Спробуйте ще раз трохи пізніше.');
+        return;
+      }
+
+      await notifyLawyerAboutClientMessage(
+        lawyerBotToken,
+        lawyer.id,
+        identity.user.name,
+        messageText,
+      );
+
+      resetSession(ctx.session);
+      await ctx.reply('✅ Повідомлення передано адвокату. Якщо потрібно, натисніть "💬 Написати адвокату" ще раз.');
       return;
     }
 
@@ -1157,7 +1351,7 @@ export function createClientBot(opts: BotOptions): Bot {
           });
         });
 
-        ctx.session.step = 'idle';
+        resetSession(ctx.session);
 
         await ctx.reply(
           `<b>✅ Реєстрацію завершено!</b>\n` +
@@ -1168,19 +1362,11 @@ export function createClientBot(opts: BotOptions): Bot {
         );
 
         // Show client menu
-        const clientKeyboard = new InlineKeyboard()
-          .text('📝 Залишити заявку', 'c:intake')
-          .text('📅 Записатись', 'c:book').row()
-          .text('📋 Мої справи', 'c:cases')
-          .text('📎 Завантажити файл', 'c:upload').row()
-          .text('💬 Написати адвокату', 'c:msg')
-          .text('ℹ️ Про нас', 'c:about');
-
         await ctx.reply(
           `<b>👋 Ласкаво просимо до ЮрБот!</b>\n` +
           `━━━━━━━━━━━━━━━━━\n` +
           `Ваш цифровий юридичний асистент`,
-          { parse_mode: 'HTML', reply_markup: clientKeyboard },
+          { parse_mode: 'HTML', reply_markup: buildClientActionKeyboard() },
         );
 
         // Open Mini App
@@ -1201,11 +1387,11 @@ export function createClientBot(opts: BotOptions): Bot {
 
         // Notify lawyer about new client
         if (tokenData) {
-          notifyLawyerAboutClient(lawyerBotToken, tokenData.lawyerId, name, phone).catch(() => {});
+          await notifyLawyerAboutClient(lawyerBotToken, tokenData.lawyerId, name, phone);
         }
       } catch (err) {
         console.error('[Client Bot] Onboarding error:', err);
-        ctx.session.step = 'idle';
+        resetSession(ctx.session);
         await ctx.reply('Помилка при реєстрації. Спробуйте ще раз.');
       }
       return;
@@ -1403,7 +1589,8 @@ export function createClientBot(opts: BotOptions): Bot {
 
   bot.callbackQuery('c:msg', async (ctx) => {
     await ctx.answerCallbackQuery();
-    await ctx.reply('💬 Напишіть повідомлення у цей чат — адвокат отримає сповіщення.');
+    ctx.session.step = 'awaiting_client_message';
+    await ctx.reply('💬 Напишіть повідомлення у цей чат — я одразу передам його адвокату.');
   });
 
   bot.callbackQuery('c:about', async (ctx) => {
