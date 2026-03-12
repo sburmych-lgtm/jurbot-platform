@@ -14,6 +14,7 @@ export function initBots(): { lawyerBot: Bot | null; clientBot: Bot | null } {
       token: config.telegramLawyerToken,
       miniAppUrl,
       superadminTelegramId,
+      clientBotToken: config.telegramClientToken,
     });
     console.log('[Telegram] Lawyer bot initialized');
   } else {
@@ -25,6 +26,7 @@ export function initBots(): { lawyerBot: Bot | null; clientBot: Bot | null } {
       token: config.telegramClientToken,
       miniAppUrl,
       superadminTelegramId,
+      lawyerBotToken: config.telegramLawyerToken,
     });
     console.log('[Telegram] Client bot initialized');
   } else {

@@ -66,6 +66,7 @@ enum NotificationType {
   DOCUMENT_READY
   MESSAGE
   SYSTEM
+  NEW_CLIENT
 }
 
 enum OrgRole {

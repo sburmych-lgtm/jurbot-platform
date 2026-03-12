@@ -5,8 +5,14 @@ import { prisma } from '@jurbot/db';
 
 // ─── Session types ──────────────────────────────────────────
 interface OnboardingSession {
-  step: 'idle' | 'awaiting_name' | 'awaiting_phone' | 'awaiting_reset_confirm';
+  step:
+    | 'idle'
+    | 'awaiting_name'
+    | 'awaiting_phone'
+    | 'awaiting_specialization'
+    | 'awaiting_reset_confirm';
   name?: string;
+  specialties?: string[];
   tokenData?: { tokenId: string; orgId: string; lawyerId: string; caseId?: string };
 }
 
@@ -16,10 +22,24 @@ interface BotOptions {
   token: string;
   miniAppUrl?: string;
   superadminTelegramId?: bigint | null;
+  clientBotToken?: string;
+  lawyerBotToken?: string;
 }
 
 const PLACEHOLDER_TOKEN = 'PLACEHOLDER_PROVIDE_LATER';
 const TRIAL_DAYS = 14;
+
+// Category labels for specialization picker
+const SPECIALIZATION_MAP: Record<string, string> = {
+  FAMILY: '👨‍👩‍👧 Сімейне',
+  CIVIL: '⚖️ Цивільне',
+  COMMERCIAL: '🏢 Господарське',
+  CRIMINAL: '🔒 Кримінальне',
+  MIGRATION: '✈️ Міграційне',
+  REALESTATE: '🏠 Нерухомість',
+  LABOR: '👷 Трудове',
+  OTHER: '📋 Інше',
+};
 
 export function isPlaceholderToken(token: string): boolean {
   return token === PLACEHOLDER_TOKEN || token.trim() === '';
@@ -103,6 +123,81 @@ async function deleteUserByTelegramId(telegramId: bigint): Promise<boolean> {
   return true;
 }
 
+// ─── Notify lawyer when client registers ─────────────────────
+async function notifyLawyerAboutClient(
+  lawyerBotToken: string | undefined,
+  lawyerId: string,
+  clientName: string,
+  clientPhone: string,
+): Promise<void> {
+  if (!lawyerBotToken || isPlaceholderToken(lawyerBotToken)) return;
+
+  try {
+    const lawyerProfile = await prisma.lawyerProfile.findUnique({
+      where: { id: lawyerId },
+      include: { user: true },
+    });
+    if (!lawyerProfile) return;
+
+    const lawyerIdentity = await prisma.telegramIdentity.findFirst({
+      where: { userId: lawyerProfile.userId, botType: 'lawyer' },
+    });
+    if (!lawyerIdentity) return;
+
+    const text =
+      '🔔 <b>Новий клієнт зареєструвався!</b>\n\n' +
+      `👤 Ім'я: ${clientName}\n` +
+      `📱 Телефон: ${clientPhone}\n\n` +
+      '📱 Відкрийте Mini App для деталей.';
+
+    const url = `https://api.telegram.org/bot${lawyerBotToken}/sendMessage`;
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: lawyerIdentity.chatId.toString(),
+        text,
+        parse_mode: 'HTML',
+      }),
+    });
+
+    // Create notification in DB
+    await prisma.notification.create({
+      data: {
+        userId: lawyerProfile.userId,
+        orgId: lawyerProfile.orgId ?? undefined,
+        type: 'NEW_CLIENT',
+        title: 'Новий клієнт',
+        body: `${clientName} зареєструвався через ваше запрошення.`,
+        telegramSent: true,
+      },
+    });
+  } catch (err) {
+    console.error('[Notify] Failed to notify lawyer:', err);
+  }
+}
+
+// ─── Specialization keyboard builder ─────────────────────────
+function buildSpecializationKeyboard(selected: string[]): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  const entries = Object.entries(SPECIALIZATION_MAP);
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i]!;
+    const key = entry[0];
+    const label = entry[1];
+    const check = selected.includes(key) ? '✅ ' : '';
+    kb.text(`${check}${label}`, `spec:${key}`);
+    if (i % 2 === 1) kb.row();
+  }
+
+  if (selected.length > 0) {
+    kb.row().text('✅ Підтвердити вибір', 'spec:done');
+  }
+
+  return kb;
+}
+
 // ─── Lawyer Dashboard Builder ────────────────────────────────
 async function buildLawyerDashboard(userId: string, sa: boolean) {
   const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
@@ -122,34 +217,42 @@ async function buildLawyerDashboard(userId: string, sa: boolean) {
   }
 
   const keyboard = new InlineKeyboard()
-    .text('\u{1F4DD} \u041D\u043E\u0432\u0456 \u0437\u0430\u044F\u0432\u043A\u0438', 'l:intake')
-    .text('\u{1F4CB} \u041C\u043E\u0457 \u0441\u043F\u0440\u0430\u0432\u0438', 'l:cases').row()
-    .text('\u{1F4C5} \u0420\u043E\u0437\u043A\u043B\u0430\u0434', 'l:schedule')
-    .text('\u{1F4C4} AI \u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0438', 'l:docs').row()
-    .text('\u{1F465} \u041A\u043B\u0456\u0454\u043D\u0442\u0438', 'l:clients')
-    .text('\u2699\uFE0F \u041D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F', 'l:settings').row();
+    .text('📝 Нові заявки', 'l:intake')
+    .text('📋 Мої справи', 'l:cases').row()
+    .text('📅 Розклад', 'l:schedule')
+    .text('📄 AI Документи', 'l:docs').row()
+    .text('👥 Клієнти', 'l:clients')
+    .text('⚙️ Налаштування', 'l:settings').row();
 
   if (sa) {
-    keyboard.text('\u{1F527} \u0410\u0434\u043C\u0456\u043D \u043F\u0430\u043D\u0435\u043B\u044C', 'l:admin');
+    keyboard.text('🔧 Адмін панель', 'l:admin');
   }
 
-  const badge = sa ? ' \u{1F451}' : '';
+  const badge = sa ? ' 👑' : '';
   const text =
-    `<b>\u2696\uFE0F \u042E\u0440\u0411\u043E\u0442 PRO</b>${badge}\n` +
-    `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n` +
-    `\u0412\u0430\u0448 \u043E\u043F\u0435\u0440\u0430\u0446\u0456\u0439\u043D\u0438\u0439 \u043A\u0430\u0431\u0456\u043D\u0435\u0442 \u0430\u0434\u0432\u043E\u043A\u0430\u0442\u0430\n\n` +
-    `\u{1F4CA} \u0421\u043F\u0440\u0430\u0432: ${caseCount} | \u{1F465} \u041A\u043B\u0456\u0454\u043D\u0442\u0456\u0432: ${clientCount}\n` +
-    `\u{1F4C5} \u0421\u044C\u043E\u0433\u043E\u0434\u043D\u0456: ${todayCount} | \u{1F4DD} \u0417\u0430\u044F\u0432\u043E\u043A: 0`;
+    `<b>⚖️ ЮрБот PRO</b>${badge}\n` +
+    `━━━━━━━━━━━━━━━━━\n` +
+    `Ваш операційний кабінет адвоката\n\n` +
+    `📊 Справ: ${caseCount} | 👥 Клієнтів: ${clientCount}\n` +
+    `📅 Сьогодні: ${todayCount} | 📝 Заявок: 0`;
 
   return { text, keyboard };
 }
 
+// ─── Mini App keyboard builder ───────────────────────────────
+function buildMiniAppKeyboard(miniAppUrl: string, label: string): InlineKeyboard {
+  return new InlineKeyboard().webApp(`📱 ${label}`, miniAppUrl);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // ─── Lawyer Bot ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 export function createLawyerBot(opts: BotOptions): Bot {
   const { token, miniAppUrl, superadminTelegramId } = opts;
   const bot = new Bot<BotContext>(token);
   bot.use(session({ initial: initialSession }));
 
+  // ── /start ──
   bot.command('start', async (ctx) => {
     const telegramId = BigInt(ctx.from!.id);
     const sa = isSuperadmin(telegramId, superadminTelegramId);
@@ -161,90 +264,103 @@ export function createLawyerBot(opts: BotOptions): Bot {
     });
 
     if (existing) {
+      // Already registered — show dashboard + Mini App
       const { text, keyboard } = await buildLawyerDashboard(existing.userId, sa);
       await ctx.reply(text, { parse_mode: 'HTML', reply_markup: keyboard });
+
+      if (miniAppUrl) {
+        await ctx.reply('📱 Відкрийте Mini App для повного доступу:', {
+          reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот'),
+        });
+      }
       return;
     }
 
-    ctx.session.step = 'awaiting_name';
+    // New user — show welcome with "Почати" button
+    const badge = sa ? '\n\n👑 <i>SUPERADMIN розпізнано</i>' : '';
 
-    if (sa) {
-      await ctx.reply(
-        '\u{1F451} SUPERADMIN \u0440\u043E\u0437\u043F\u0456\u0437\u043D\u0430\u043D\u043E!\n\n' +
-        '\u2696\uFE0F \u041B\u0430\u0441\u043A\u0430\u0432\u043E \u043F\u0440\u043E\u0441\u0438\u043C\u043E \u0434\u043E \u042E\u0440\u0411\u043E\u0442!\n' +
-        '\u042F \u0434\u043E\u043F\u043E\u043C\u043E\u0436\u0443 \u0432\u0430\u043C \u043A\u0435\u0440\u0443\u0432\u0430\u0442\u0438 \u0441\u043F\u0440\u0430\u0432\u0430\u043C\u0438, \u043A\u043B\u0456\u0454\u043D\u0442\u0430\u043C\u0438 \u0442\u0430 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u043C\u0438.\n\n' +
-        '\u{1F4E6} \u041F\u0456\u0441\u043B\u044F \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u0457 \u0432\u0438 \u043E\u0442\u0440\u0438\u043C\u0430\u0454\u0442\u0435 \u043F\u043B\u0430\u043D BUREAU \u0431\u0435\u0437 \u043E\u0431\u043C\u0435\u0436\u0435\u043D\u044C.\n\n' +
-        '\u0414\u043B\u044F \u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u0432\u043A\u0430\u0436\u0456\u0442\u044C \u0432\u0430\u0448\u0435 \u043F\u043E\u0432\u043D\u0435 \u0456\u043C\'\u044F:',
-      );
-    } else {
-      await ctx.reply(
-        '\u2696\uFE0F \u041B\u0430\u0441\u043A\u0430\u0432\u043E \u043F\u0440\u043E\u0441\u0438\u043C\u043E \u0434\u043E \u042E\u0440\u0411\u043E\u0442!\n\n' +
-        '\u042F \u0434\u043E\u043F\u043E\u043C\u043E\u0436\u0443 \u0432\u0430\u043C \u043A\u0435\u0440\u0443\u0432\u0430\u0442\u0438 \u0441\u043F\u0440\u0430\u0432\u0430\u043C\u0438, \u043A\u043B\u0456\u0454\u043D\u0442\u0430\u043C\u0438 \u0442\u0430 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u043C\u0438.\n\n' +
-        '\u0414\u043B\u044F \u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u0432\u043A\u0430\u0436\u0456\u0442\u044C \u0432\u0430\u0448\u0435 \u043F\u043E\u0432\u043D\u0435 \u0456\u043C\'\u044F:',
-      );
-    }
+    await ctx.reply(
+      `<b>⚖️ Ласкаво просимо до ЮрБот PRO!</b>\n` +
+      `━━━━━━━━━━━━━━━━━\n\n` +
+      `🏛️ Платформа для сучасного адвоката:\n\n` +
+      `📋 Управління справами та клієнтами\n` +
+      `📅 Розклад та записи\n` +
+      `📄 AI-генерація документів\n` +
+      `🔗 Зв'язок з клієнтами через бот\n` +
+      `📊 Аналітика та звітність\n` +
+      badge,
+      {
+        parse_mode: 'HTML',
+        reply_markup: new InlineKeyboard().text('▶️ Почати', 'onboard:start'),
+      },
+    );
   });
 
-  bot.on('message:text', async (ctx) => {
-    const { step } = ctx.session;
+  // ── Onboarding step 1: "Почати" pressed ──
+  bot.callbackQuery('onboard:start', async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const telegramId = BigInt(ctx.from!.id);
+    const sa = isSuperadmin(telegramId, superadminTelegramId);
 
-    if (step === 'awaiting_reset_confirm') {
-      const text = ctx.message.text.trim().toLowerCase();
-      if (text === '\u0442\u0430\u043A' || text === 'yes') {
-        const telegramId = BigInt(ctx.from!.id);
-        try {
-          const deleted = await deleteUserByTelegramId(telegramId);
-          ctx.session.step = 'idle';
-          if (deleted) {
-            await ctx.reply('\u{1F5D1} \u0414\u0430\u043D\u0456 \u0432\u0438\u0434\u0430\u043B\u0435\u043D\u043E. \u041D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C /start \u0434\u043B\u044F \u043D\u043E\u0432\u043E\u0457 \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u0457.');
-          } else {
-            await ctx.reply('\u274C \u0414\u0430\u043D\u0456 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E.');
-          }
-        } catch (err) {
-          console.error('[Lawyer Bot] Reset error:', err);
-          ctx.session.step = 'idle';
-          await ctx.reply('\u274C \u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043F\u0440\u0438 \u0432\u0438\u0434\u0430\u043B\u0435\u043D\u043D\u0456. \u0421\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0449\u0435 \u0440\u0430\u0437.');
-        }
-      } else {
-        ctx.session.step = 'idle';
-        await ctx.reply('\u0421\u043A\u0430\u0441\u043E\u0432\u0430\u043D\u043E.');
-      }
-      return;
-    }
+    const planMsg = sa
+      ? '👑 Як SUPERADMIN, ви отримаєте план <b>BUREAU</b> без обмежень.'
+      : '🎁 Безкоштовний 14-денний пробний період після реєстрації.';
 
-    if (step === 'awaiting_name') {
-      const name = ctx.message.text.trim();
-      if (name.length < 2 || name.length > 100) {
-        await ctx.reply('\u0412\u043A\u0430\u0436\u0456\u0442\u044C \u043A\u043E\u0440\u0435\u043A\u0442\u043D\u0435 \u0456\u043C\'\u044F (2\u2013100 \u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432):');
-        return;
-      }
-      ctx.session.name = name;
-      ctx.session.step = 'awaiting_phone';
-      await ctx.reply(
-        '\u0414\u044F\u043A\u0443\u044E, ' + name + '!\n\n' +
-        '\u0422\u0435\u043F\u0435\u0440 \u0432\u043A\u0430\u0436\u0456\u0442\u044C \u0432\u0430\u0448 \u043D\u043E\u043C\u0435\u0440 \u0442\u0435\u043B\u0435\u0444\u043E\u043D\u0443 (\u043D\u0430\u043F\u0440\u0438\u043A\u043B\u0430\u0434, +380991234567):',
-      );
-      return;
-    }
+    await ctx.editMessageText(
+      `<b>⚖️ ЮрБот PRO — Реєстрація</b>\n` +
+      `━━━━━━━━━━━━━━━━━\n\n` +
+      `Реєстрація займе лише 2 хвилини.\n\n` +
+      `Ви отримаєте:\n` +
+      `✅ Особистий кабінет адвоката\n` +
+      `✅ Посилання для підключення клієнтів\n` +
+      `✅ Доступ до Mini App\n\n` +
+      planMsg,
+      {
+        parse_mode: 'HTML',
+        reply_markup: new InlineKeyboard().text('📝 Зареєструватися', 'onboard:register'),
+      },
+    );
+  });
 
-    if (step === 'awaiting_phone') {
-      const phone = ctx.message.text.trim().replace(/[\s\-()]/g, '');
-      if (!/^\+?\d{10,15}$/.test(phone)) {
-        await ctx.reply('\u041D\u0435\u043A\u043E\u0440\u0435\u043A\u0442\u043D\u0438\u0439 \u043D\u043E\u043C\u0435\u0440. \u0412\u043A\u0430\u0436\u0456\u0442\u044C \u0443 \u0444\u043E\u0440\u043C\u0430\u0442\u0456 +380991234567:');
-        return;
-      }
+  // ── Onboarding step 2: "Зареєструватися" pressed ──
+  bot.callbackQuery('onboard:register', async (ctx) => {
+    await ctx.answerCallbackQuery();
+    ctx.session.step = 'awaiting_name';
 
+    await ctx.editMessageText(
+      `<b>📝 Крок 1 з 3 — Ваше ім'я</b>\n` +
+      `━━━━━━━━━━━━━━━━━\n\n` +
+      `Введіть ваше повне ім'я:`,
+      { parse_mode: 'HTML' },
+    );
+  });
+
+  // ── Specialization selection callbacks ──
+  bot.callbackQuery(/^spec:(.+)$/, async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const value = ctx.match![1] ?? '';
+
+    if (value === 'done') {
+      // Finalize registration with selected specialties
       const telegramId = BigInt(ctx.from!.id);
       const name = ctx.session.name!;
       const sa = isSuperadmin(telegramId, superadminTelegramId);
+      const specialties = (ctx.session.specialties ?? []) as Array<'FAMILY' | 'CIVIL' | 'COMMERCIAL' | 'CRIMINAL' | 'MIGRATION' | 'REALESTATE' | 'LABOR' | 'OTHER'>;
 
       try {
         const result = await prisma.$transaction(async (tx) => {
+          // Phone was already saved to session at step awaiting_phone
+          // We stored it in ctx.session.name as "name" but phone is separate
+          // Actually we need to get phone from somewhere — let me check
+          // Phone should have been passed along. Let me use a different approach:
+          // We'll store phone in tokenData temporarily
+          const phone = (ctx.session.tokenData as unknown as { phone?: string })?.phone ?? '';
+
           const user = await tx.user.create({
             data: { name, phone, role: 'LAWYER', telegramId },
           });
 
-          const orgName = name + ' \u2014 \u042E\u0440\u0438\u0434\u0438\u0447\u043D\u0430 \u043F\u0440\u0430\u043A\u0442\u0438\u043A\u0430';
+          const orgName = name + ' — Юридична практика';
           const org = await tx.organization.create({
             data: { name: orgName, slug: slugify(orgName) },
           });
@@ -254,7 +370,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
           });
 
           const profile = await tx.lawyerProfile.create({
-            data: { userId: user.id, orgId: org.id },
+            data: { userId: user.id, orgId: org.id, specialties },
           });
 
           await tx.telegramIdentity.create({
@@ -288,61 +404,167 @@ export function createLawyerBot(opts: BotOptions): Bot {
 
         ctx.session.step = 'idle';
 
-        const botUsername = ctx.me.username;
-        const clientBotUsername = botUsername.replace('Pro', 'Client').replace('pro', 'client');
-        const inviteLink = 'https://t.me/' + clientBotUsername + '?start=' + result.inviteToken.token;
-
+        const specialtiesText = specialties.map(s => SPECIALIZATION_MAP[s] ?? s).join(', ');
         const planMsg = sa
-          ? '\u{1F451} SUPERADMIN \u2014 \u043F\u043B\u0430\u043D BUREAU (\u0431\u0435\u0437 \u043E\u0431\u043C\u0435\u0436\u0435\u043D\u044C)'
-          : '\u{1F381} 14-\u0434\u0435\u043D\u043D\u0438\u0439 \u043F\u0440\u043E\u0431\u043D\u0438\u0439 \u043F\u0435\u0440\u0456\u043E\u0434 \u0430\u043A\u0442\u0438\u0432\u043E\u0432\u0430\u043D\u043E';
+          ? '👑 SUPERADMIN — план BUREAU (без обмежень)'
+          : '🎁 14-денний пробний період активовано';
 
-        await ctx.reply(
-          '\u2705 \u0420\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u044E \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E!\n\n' +
-          '\u{1F3DB}\uFE0F \u041E\u0440\u0433\u0430\u043D\u0456\u0437\u0430\u0446\u0456\u044E \u0441\u0442\u0432\u043E\u0440\u0435\u043D\u043E\n' +
-          planMsg + '\n\n' +
-          '\u{1F517} \u041F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F \u0434\u043B\u044F \u043A\u043B\u0456\u0454\u043D\u0442\u0456\u0432:\n' + inviteLink,
+        const clientBotLink = `https://t.me/YurBotClientBot?start=${result.inviteToken.token}`;
+
+        await ctx.editMessageText(
+          `<b>✅ Реєстрацію завершено!</b>\n` +
+          `━━━━━━━━━━━━━━━━━\n\n` +
+          `👤 ${name}\n` +
+          `📋 ${specialtiesText}\n` +
+          `🏛️ ${result.org.name}\n` +
+          `${planMsg}\n\n` +
+          `🔗 <b>Посилання для клієнтів:</b>\n` +
+          `<code>${clientBotLink}</code>\n\n` +
+          `Надішліть це посилання клієнту для підключення.`,
+          { parse_mode: 'HTML' },
         );
 
-        // Show the dashboard right after registration
+        // Show dashboard
         const { text: dashText, keyboard } = await buildLawyerDashboard(result.user.id, sa);
         await ctx.reply(dashText, { parse_mode: 'HTML', reply_markup: keyboard });
 
+        // Open Mini App
         if (miniAppUrl) {
+          await ctx.reply('📱 Ваш кабінет готовий! Відкрийте Mini App:', {
+            reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот'),
+          });
+
           try {
             await bot.api.setChatMenuButton({
               chat_id: Number(telegramId),
-              menu_button: { type: 'web_app', text: '\u{1F4BC} \u042E\u0440\u0411\u043E\u0442', web_app: { url: miniAppUrl } },
+              menu_button: { type: 'web_app', text: '💼 ЮрБот', web_app: { url: miniAppUrl } },
             });
           } catch (e) {
             console.warn('[Lawyer Bot] Failed to set menu button:', e);
           }
         }
       } catch (err) {
-        console.error('[Lawyer Bot] Onboarding error:', err);
+        console.error('[Lawyer Bot] Registration error:', err);
         ctx.session.step = 'idle';
-        await ctx.reply('\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043F\u0440\u0438 \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u0457. \u0421\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 /start \u0449\u0435 \u0440\u0430\u0437.');
+        await ctx.reply('❌ Помилка при реєстрації. Спробуйте /start ще раз.');
       }
       return;
     }
 
-    await ctx.reply('\u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0439\u0442\u0435 /help \u0434\u043B\u044F \u0441\u043F\u0438\u0441\u043A\u0443 \u043A\u043E\u043C\u0430\u043D\u0434.');
+    // Toggle specialization
+    const selected = ctx.session.specialties ?? [];
+    const idx = selected.indexOf(value);
+    if (idx >= 0) {
+      selected.splice(idx, 1);
+    } else {
+      selected.push(value);
+    }
+    ctx.session.specialties = selected;
+
+    const selectedText = selected.length > 0
+      ? `\n\nОбрано: ${selected.map(s => SPECIALIZATION_MAP[s] ?? s).join(', ')}`
+      : '';
+
+    await ctx.editMessageText(
+      `<b>📝 Крок 3 з 3 — Спеціалізація</b>\n` +
+      `━━━━━━━━━━━━━━━━━\n\n` +
+      `Оберіть вашу спеціалізацію (можна кілька):${selectedText}`,
+      {
+        parse_mode: 'HTML',
+        reply_markup: buildSpecializationKeyboard(selected),
+      },
+    );
   });
 
+  // ── Text message handler (name, phone) ──
+  bot.on('message:text', async (ctx) => {
+    const { step } = ctx.session;
+
+    if (step === 'awaiting_reset_confirm') {
+      const text = ctx.message.text.trim().toLowerCase();
+      if (text === 'так' || text === 'yes') {
+        const telegramId = BigInt(ctx.from!.id);
+        try {
+          const deleted = await deleteUserByTelegramId(telegramId);
+          ctx.session.step = 'idle';
+          if (deleted) {
+            await ctx.reply('🗑 Дані видалено. Натисніть /start для нової реєстрації.');
+          } else {
+            await ctx.reply('❌ Дані не знайдено.');
+          }
+        } catch (err) {
+          console.error('[Lawyer Bot] Reset error:', err);
+          ctx.session.step = 'idle';
+          await ctx.reply('❌ Помилка при видаленні. Спробуйте ще раз.');
+        }
+      } else {
+        ctx.session.step = 'idle';
+        await ctx.reply('Скасовано.');
+      }
+      return;
+    }
+
+    if (step === 'awaiting_name') {
+      const name = ctx.message.text.trim();
+      if (name.length < 2 || name.length > 100) {
+        await ctx.reply('Вкажіть коректне ім\'я (2–100 символів):');
+        return;
+      }
+      ctx.session.name = name;
+      ctx.session.step = 'awaiting_phone';
+      await ctx.reply(
+        `<b>📝 Крок 2 з 3 — Телефон</b>\n` +
+        `━━━━━━━━━━━━━━━━━\n\n` +
+        `Дякую, ${name}!\n\n` +
+        `Вкажіть ваш номер телефону\n(наприклад, +380991234567):`,
+        { parse_mode: 'HTML' },
+      );
+      return;
+    }
+
+    if (step === 'awaiting_phone') {
+      const phone = ctx.message.text.trim().replace(/[\s\-()]/g, '');
+      if (!/^\+?\d{10,15}$/.test(phone)) {
+        await ctx.reply('Некоректний номер. Вкажіть у форматі +380991234567:');
+        return;
+      }
+
+      // Store phone for later use in spec:done callback
+      ctx.session.tokenData = { phone } as unknown as OnboardingSession['tokenData'];
+      ctx.session.step = 'awaiting_specialization';
+      ctx.session.specialties = [];
+
+      await ctx.reply(
+        `<b>📝 Крок 3 з 3 — Спеціалізація</b>\n` +
+        `━━━━━━━━━━━━━━━━━\n\n` +
+        `Оберіть вашу спеціалізацію (можна кілька):`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: buildSpecializationKeyboard([]),
+        },
+      );
+      return;
+    }
+
+    await ctx.reply('Використовуйте /help для списку команд.');
+  });
+
+  // ── Commands ──
   bot.command('help', async (ctx) => {
     const telegramId = BigInt(ctx.from!.id);
     const sa = isSuperadmin(telegramId, superadminTelegramId);
 
     let text =
-      '\u{1F4CB} \u0414\u043E\u0441\u0442\u0443\u043F\u043D\u0456 \u043A\u043E\u043C\u0430\u043D\u0434\u0438:\n\n' +
-      '/start \u2014 \u0413\u043E\u043B\u043E\u0432\u043D\u0435 \u043C\u0435\u043D\u044E\n' +
-      '/invite \u2014 \u041E\u0442\u0440\u0438\u043C\u0430\u0442\u0438 \u043F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F \u0434\u043B\u044F \u043A\u043B\u0456\u0454\u043D\u0442\u0456\u0432\n' +
-      '/cases \u2014 \u041C\u043E\u0457 \u0441\u043F\u0440\u0430\u0432\u0438\n' +
-      '/schedule \u2014 \u0420\u043E\u0437\u043A\u043B\u0430\u0434 \u043D\u0430 \u0441\u044C\u043E\u0433\u043E\u0434\u043D\u0456\n' +
-      '/admin \u2014 \u0406\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0456\u044F \u043F\u0440\u043E \u043E\u0431\u043B\u0456\u043A\u043E\u0432\u0438\u0439 \u0437\u0430\u043F\u0438\u0441\n' +
-      '/reset \u2014 \u0421\u043A\u0438\u043D\u0443\u0442\u0438 \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u044E';
+      '📋 Доступні команди:\n\n' +
+      '/start — Головне меню\n' +
+      '/invite — Отримати посилання для клієнтів\n' +
+      '/cases — Мої справи\n' +
+      '/schedule — Розклад на сьогодні\n' +
+      '/admin — Інформація про обліковий запис\n' +
+      '/reset — Скинути реєстрацію';
 
     if (sa) {
-      text += '\n\n\u{1F451} Superadmin:\n/stats \u2014 \u0421\u0438\u0441\u0442\u0435\u043C\u043D\u0430 \u0441\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430';
+      text += '\n\n👑 Superadmin:\n/stats — Системна статистика';
     }
 
     await ctx.reply(text);
@@ -357,7 +579,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
     });
 
     if (!identity) {
-      await ctx.reply('\u274C \u0412\u0438 \u043D\u0435 \u0437\u0430\u0440\u0435\u0454\u0441\u0442\u0440\u043E\u0432\u0430\u043D\u0456. \u041D\u0430\u0442\u0438\u0441\u043D\u0456\u0442\u044C /start');
+      await ctx.reply('❌ Ви не зареєстровані. Натисніть /start');
       return;
     }
 
@@ -367,21 +589,26 @@ export function createLawyerBot(opts: BotOptions): Bot {
     const sub = org ? await prisma.subscription.findUnique({ where: { orgId: org.id } }) : null;
 
     const lines = [
-      '\u{1F464} \u0410\u0434\u043C\u0456\u043D-\u043F\u0430\u043D\u0435\u043B\u044C' + (sa ? ' \u{1F451} SUPERADMIN' : '') + '\n',
-      '\u{1F4CC} Telegram ID: ' + ctx.from!.id,
-      '\u{1F4E7} \u0406\u043C\'\u044F: ' + user.name,
-      '\u{1F4F1} \u0422\u0435\u043B\u0435\u0444\u043E\u043D: ' + (user.phone || '\u2014'),
-      '\u{1F3DB}\uFE0F \u041E\u0440\u0433\u0430\u043D\u0456\u0437\u0430\u0446\u0456\u044F: ' + (org?.name || '\u2014'),
+      '👤 Адмін-панель' + (sa ? ' 👑 SUPERADMIN' : '') + '\n',
+      '📌 Telegram ID: ' + ctx.from!.id,
+      '📧 Ім\'я: ' + user.name,
+      '📱 Телефон: ' + (user.phone || '—'),
+      '🏛️ Організація: ' + (org?.name || '—'),
     ];
 
+    if (profile?.specialties && profile.specialties.length > 0) {
+      const specText = profile.specialties.map(s => SPECIALIZATION_MAP[s] ?? s).join(', ');
+      lines.push('📋 Спеціалізація: ' + specText);
+    }
+
     if (sub) {
-      lines.push('\u{1F4E6} \u041F\u043B\u0430\u043D: ' + sub.plan + (sa ? ' (superadmin)' : ''));
-      lines.push('\u{1F4C5} \u0421\u0442\u0430\u0442\u0443\u0441: ' + sub.status);
+      lines.push('📦 План: ' + sub.plan + (sa ? ' (superadmin)' : ''));
+      lines.push('📅 Статус: ' + sub.status);
       if (sub.expiresAt && !sa) {
-        lines.push('\u23F0 \u0414\u0456\u0439\u0441\u043D\u0438\u0439 \u0434\u043E: ' + sub.expiresAt.toLocaleDateString('uk-UA'));
+        lines.push('⏰ Дійсний до: ' + sub.expiresAt.toLocaleDateString('uk-UA'));
       }
       if (sa) {
-        lines.push('\u267E\uFE0F \u0411\u0435\u0437 \u043E\u0431\u043C\u0435\u0436\u0435\u043D\u044C \u0442\u0435\u0440\u043C\u0456\u043D\u0443');
+        lines.push('♾️ Без обмежень терміну');
       }
     }
 
@@ -389,7 +616,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
       const tokenCount = await prisma.inviteToken.count({
         where: { lawyerId: profile.id, isActive: true },
       });
-      lines.push('\u{1F517} \u0410\u043A\u0442\u0438\u0432\u043D\u0438\u0445 \u0442\u043E\u043A\u0435\u043D\u0456\u0432: ' + tokenCount);
+      lines.push('🔗 Активних токенів: ' + tokenCount);
     }
 
     await ctx.reply(lines.join('\n'));
@@ -398,7 +625,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
   bot.command('stats', async (ctx) => {
     const telegramId = BigInt(ctx.from!.id);
     if (!isSuperadmin(telegramId, superadminTelegramId)) {
-      await ctx.reply('\u274C \u0414\u043E\u0441\u0442\u0443\u043F \u0437\u0430\u0431\u043E\u0440\u043E\u043D\u0435\u043D\u043E.');
+      await ctx.reply('❌ Доступ заборонено.');
       return;
     }
 
@@ -411,25 +638,25 @@ export function createLawyerBot(opts: BotOptions): Bot {
     ]);
 
     await ctx.reply(
-      '\u{1F451} \u0421\u0438\u0441\u0442\u0435\u043C\u043D\u0430 \u0441\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430:\n\n' +
-      '\u{1F464} \u041A\u043E\u0440\u0438\u0441\u0442\u0443\u0432\u0430\u0447\u0456\u0432: ' + userCount + '\n' +
-      '\u{1F3DB}\uFE0F \u041E\u0440\u0433\u0430\u043D\u0456\u0437\u0430\u0446\u0456\u0439: ' + orgCount + '\n' +
-      '\u{1F4C1} \u0421\u043F\u0440\u0430\u0432: ' + caseCount + '\n' +
-      '\u{1F4E6} \u041F\u0456\u0434\u043F\u0438\u0441\u043E\u043A: ' + subCount + '\n' +
-      '\u{1F381} \u0410\u043A\u0442\u0438\u0432\u043D\u0438\u0445 \u0442\u0440\u0456\u0430\u043B\u0456\u0432: ' + activeTrials,
+      '👑 Системна статистика:\n\n' +
+      '👤 Користувачів: ' + userCount + '\n' +
+      '🏛️ Організацій: ' + orgCount + '\n' +
+      '📁 Справ: ' + caseCount + '\n' +
+      '📦 Підписок: ' + subCount + '\n' +
+      '🎁 Активних тріалів: ' + activeTrials,
     );
   });
 
   bot.command('reset', async (ctx) => {
     ctx.session.step = 'awaiting_reset_confirm';
     await ctx.reply(
-      '\u26A0\uFE0F \u0412\u0438 \u0432\u043F\u0435\u0432\u043D\u0435\u043D\u0456 \u0449\u043E \u0445\u043E\u0447\u0435\u0442\u0435 \u0432\u0438\u0434\u0430\u043B\u0438\u0442\u0438 \u0441\u0432\u043E\u0457 \u0434\u0430\u043D\u0456?\n\n' +
-      '\u0426\u0435 \u0432\u0438\u0434\u0430\u043B\u0438\u0442\u044C:\n' +
-      '\u2022 \u0412\u0430\u0448 \u043E\u0431\u043B\u0456\u043A\u043E\u0432\u0438\u0439 \u0437\u0430\u043F\u0438\u0441\n' +
-      '\u2022 \u041E\u0440\u0433\u0430\u043D\u0456\u0437\u0430\u0446\u0456\u044E (\u044F\u043A\u0449\u043E \u0432\u0438 \u0432\u043B\u0430\u0441\u043D\u0438\u043A)\n' +
-      '\u2022 \u0412\u0441\u0456 \u0441\u043F\u0440\u0430\u0432\u0438 \u0442\u0430 \u0437\u0430\u043F\u0438\u0441\u0438\n' +
-      '\u2022 \u0406\u043D\u0432\u0430\u0439\u0442-\u0442\u043E\u043A\u0435\u043D\u0438\n\n' +
-      '\u041D\u0430\u043F\u0438\u0448\u0456\u0442\u044C "\u0442\u0430\u043A" \u0434\u043B\u044F \u043F\u0456\u0434\u0442\u0432\u0435\u0440\u0434\u0436\u0435\u043D\u043D\u044F:',
+      '⚠️ Ви впевнені що хочете видалити свої дані?\n\n' +
+      'Це видалить:\n' +
+      '• Ваш обліковий запис\n' +
+      '• Організацію (якщо ви власник)\n' +
+      '• Всі справи та записи\n' +
+      '• Інвайт-токени\n\n' +
+      'Напишіть "так" для підтвердження:',
     );
   });
 
@@ -441,7 +668,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
     });
 
     if (!identity?.user.lawyerProfile?.orgId) {
-      await ctx.reply('\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043F\u0440\u043E\u0439\u0434\u0456\u0442\u044C \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u044E: /start');
+      await ctx.reply('Спочатку пройдіть реєстрацію: /start');
       return;
     }
 
@@ -454,23 +681,21 @@ export function createLawyerBot(opts: BotOptions): Bot {
       },
     });
 
-    const botInfo = await bot.api.getMe();
-    const clientBotUsername = botInfo.username.replace('Pro', 'Client').replace('pro', 'client');
-    const link = 'https://t.me/' + clientBotUsername + '?start=' + inviteToken.token;
+    const link = `https://t.me/YurBotClientBot?start=${inviteToken.token}`;
 
     await ctx.reply(
-      '\u{1F517} \u041F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F \u0434\u043B\u044F \u043A\u043B\u0456\u0454\u043D\u0442\u0456\u0432:\n\n' + link + '\n\n' +
-      '\u041D\u0430\u0434\u0456\u0448\u043B\u0456\u0442\u044C \u043A\u043B\u0456\u0454\u043D\u0442\u0443 \u0434\u043B\u044F \u043F\u0456\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u043D\u044F.',
+      '🔗 Посилання для клієнтів:\n\n' + link + '\n\n' +
+      'Надішліть клієнту для підключення.',
     );
   });
 
   bot.command('cases', async (ctx) => {
     const telegramId = BigInt(ctx.from!.id);
     const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId } });
-    if (!identity) { await ctx.reply('\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043F\u0440\u043E\u0439\u0434\u0456\u0442\u044C \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u044E: /start'); return; }
+    if (!identity) { await ctx.reply('Спочатку пройдіть реєстрацію: /start'); return; }
 
     const profile = await prisma.lawyerProfile.findUnique({ where: { userId: identity.userId } });
-    if (!profile) { await ctx.reply('\u041F\u0440\u043E\u0444\u0456\u043B\u044C \u0430\u0434\u0432\u043E\u043A\u0430\u0442\u0430 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E.'); return; }
+    if (!profile) { await ctx.reply('Профіль адвоката не знайдено.'); return; }
 
     const cases = await prisma.case.findMany({
       where: { lawyerId: profile.id },
@@ -479,18 +704,18 @@ export function createLawyerBot(opts: BotOptions): Bot {
     });
 
     if (cases.length === 0) {
-      await ctx.reply('\u{1F4C1} \u0423 \u0432\u0430\u0441 \u043F\u043E\u043A\u0438 \u043D\u0435\u043C\u0430\u0454 \u0441\u043F\u0440\u0430\u0432.');
+      await ctx.reply('📁 У вас поки немає справ.');
       return;
     }
 
     const lines = cases.map((c, i) => (i + 1) + '. ' + c.title + ' [' + c.status + ']');
-    await ctx.reply('\u{1F4C1} \u0412\u0430\u0448\u0456 \u0441\u043F\u0440\u0430\u0432\u0438:\n\n' + lines.join('\n'));
+    await ctx.reply('📁 Ваші справи:\n\n' + lines.join('\n'));
   });
 
   bot.command('schedule', async (ctx) => {
     const telegramId = BigInt(ctx.from!.id);
     const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId } });
-    if (!identity) { await ctx.reply('\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043F\u0440\u043E\u0439\u0434\u0456\u0442\u044C \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u044E: /start'); return; }
+    if (!identity) { await ctx.reply('Спочатку пройдіть реєстрацію: /start'); return; }
 
     const profile = await prisma.lawyerProfile.findUnique({ where: { userId: identity.userId } });
     if (!profile) return;
@@ -506,21 +731,21 @@ export function createLawyerBot(opts: BotOptions): Bot {
     });
 
     if (appointments.length === 0) {
-      await ctx.reply('\u{1F4C5} \u041D\u0430 \u0441\u044C\u043E\u0433\u043E\u0434\u043D\u0456 \u043D\u0435\u043C\u0430\u0454 \u0437\u0430\u043F\u0438\u0441\u0456\u0432.');
+      await ctx.reply('📅 На сьогодні немає записів.');
       return;
     }
 
     const lines = appointments.map((a) => {
       const time = a.date.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
-      return '\u23F0 ' + time + (a.notes ? ' \u2014 ' + a.notes : '');
+      return '⏰ ' + time + (a.notes ? ' — ' + a.notes : '');
     });
-    await ctx.reply('\u{1F4C5} \u0420\u043E\u0437\u043A\u043B\u0430\u0434 \u043D\u0430 \u0441\u044C\u043E\u0433\u043E\u0434\u043D\u0456:\n\n' + lines.join('\n'));
+    await ctx.reply('📅 Розклад на сьогодні:\n\n' + lines.join('\n'));
   });
 
   // ── Callback query handlers ──
   bot.callbackQuery('l:intake', async (ctx) => {
     await ctx.answerCallbackQuery();
-    await ctx.reply('\u{1F4DD} \u041D\u043E\u0432\u0438\u0445 \u0437\u0430\u044F\u0432\u043E\u043A \u043F\u043E\u043A\u0438 \u043D\u0435\u043C\u0430\u0454.\n\n\u0417\u0430\u044F\u0432\u043A\u0438 \u0432\u0456\u0434 \u043A\u043B\u0456\u0454\u043D\u0442\u0456\u0432 \u0437\'\u044F\u0432\u043B\u044F\u0442\u044C\u0441\u044F \u0442\u0443\u0442 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u043E.');
+    await ctx.reply('📝 Нових заявок поки немає.\n\nЗаявки від клієнтів з\'являться тут автоматично.');
   });
 
   bot.callbackQuery('l:cases', async (ctx) => {
@@ -538,12 +763,12 @@ export function createLawyerBot(opts: BotOptions): Bot {
     });
 
     if (cases.length === 0) {
-      await ctx.reply('\u{1F4C1} \u0423 \u0432\u0430\u0441 \u043F\u043E\u043A\u0438 \u043D\u0435\u043C\u0430\u0454 \u0441\u043F\u0440\u0430\u0432.');
+      await ctx.reply('📁 У вас поки немає справ.');
       return;
     }
 
     const lines = cases.map((c, i) => `${i + 1}. ${c.title} [${c.status}]`);
-    await ctx.reply('\u{1F4C1} \u0412\u0430\u0448\u0456 \u0441\u043F\u0440\u0430\u0432\u0438:\n\n' + lines.join('\n'));
+    await ctx.reply('📁 Ваші справи:\n\n' + lines.join('\n'));
   });
 
   bot.callbackQuery('l:schedule', async (ctx) => {
@@ -565,20 +790,26 @@ export function createLawyerBot(opts: BotOptions): Bot {
     });
 
     if (appointments.length === 0) {
-      await ctx.reply('\u{1F4C5} \u041D\u0430 \u0441\u044C\u043E\u0433\u043E\u0434\u043D\u0456 \u043D\u0435\u043C\u0430\u0454 \u0437\u0430\u043F\u0438\u0441\u0456\u0432.');
+      await ctx.reply('📅 На сьогодні немає записів.');
       return;
     }
 
     const lines = appointments.map((a) => {
       const time = a.date.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
-      return `\u23F0 ${time}${a.notes ? ' \u2014 ' + a.notes : ''}`;
+      return `⏰ ${time}${a.notes ? ' — ' + a.notes : ''}`;
     });
-    await ctx.reply('\u{1F4C5} \u0420\u043E\u0437\u043A\u043B\u0430\u0434 \u043D\u0430 \u0441\u044C\u043E\u0433\u043E\u0434\u043D\u0456:\n\n' + lines.join('\n'));
+    await ctx.reply('📅 Розклад на сьогодні:\n\n' + lines.join('\n'));
   });
 
   bot.callbackQuery('l:docs', async (ctx) => {
     await ctx.answerCallbackQuery();
-    await ctx.reply('\u{1F4C4} AI \u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0438\n\n\u0413\u0435\u043D\u0435\u0440\u0430\u0446\u0456\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430 \u0447\u0435\u0440\u0435\u0437 Mini App.');
+    if (miniAppUrl) {
+      await ctx.reply('📄 AI Документи доступні через Mini App:', {
+        reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Генерація документів'),
+      });
+    } else {
+      await ctx.reply('📄 AI Документи\n\nГенерація документів доступна через Mini App.');
+    }
   });
 
   bot.callbackQuery('l:clients', async (ctx) => {
@@ -590,7 +821,14 @@ export function createLawyerBot(opts: BotOptions): Bot {
     if (!profile?.orgId) return;
 
     const clientCount = await prisma.clientProfile.count({ where: { orgId: profile.orgId } });
-    await ctx.reply(`\u{1F465} \u041A\u043B\u0456\u0454\u043D\u0442\u0456\u0432: ${clientCount}\n\n\u0414\u0435\u0442\u0430\u043B\u044C\u043D\u0438\u0439 \u0441\u043F\u0438\u0441\u043E\u043A \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0438\u0439 \u0447\u0435\u0440\u0435\u0437 Mini App.`);
+
+    if (miniAppUrl) {
+      await ctx.reply(`👥 Клієнтів: ${clientCount}\n\nДетальний список:`, {
+        reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Список клієнтів'),
+      });
+    } else {
+      await ctx.reply(`👥 Клієнтів: ${clientCount}\n\nДетальний список доступний через Mini App.`);
+    }
   });
 
   bot.callbackQuery('l:settings', async (ctx) => {
@@ -608,12 +846,12 @@ export function createLawyerBot(opts: BotOptions): Bot {
     const org = profile?.orgId ? await prisma.organization.findUnique({ where: { id: profile.orgId } }) : null;
     const sub = org ? await prisma.subscription.findUnique({ where: { orgId: org.id } }) : null;
 
-    let text = `\u2699\uFE0F \u041D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F${sa ? ' \u{1F451}' : ''}\n\n`;
-    text += `\u{1F4CC} ID: ${ctx.from!.id}\n`;
-    text += `\u{1F4E7} \u0406\u043C'\u044F: ${user.name}\n`;
-    text += `\u{1F4F1} \u0422\u0435\u043B\u0435\u0444\u043E\u043D: ${user.phone || '\u2014'}\n`;
-    if (org) text += `\u{1F3DB}\uFE0F \u041E\u0440\u0433\u0430\u043D\u0456\u0437\u0430\u0446\u0456\u044F: ${org.name}\n`;
-    if (sub) text += `\u{1F4E6} \u041F\u043B\u0430\u043D: ${sub.plan}\n`;
+    let text = `⚙️ Налаштування${sa ? ' 👑' : ''}\n\n`;
+    text += `📌 ID: ${ctx.from!.id}\n`;
+    text += `📧 Ім'я: ${user.name}\n`;
+    text += `📱 Телефон: ${user.phone || '—'}\n`;
+    if (org) text += `🏛️ Організація: ${org.name}\n`;
+    if (sub) text += `📦 План: ${sub.plan}\n`;
 
     await ctx.reply(text);
   });
@@ -622,7 +860,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
     await ctx.answerCallbackQuery();
     const telegramId = BigInt(ctx.from!.id);
     if (!isSuperadmin(telegramId, superadminTelegramId)) {
-      await ctx.reply('\u274C \u0414\u043E\u0441\u0442\u0443\u043F \u0437\u0430\u0431\u043E\u0440\u043E\u043D\u0435\u043D\u043E.');
+      await ctx.reply('❌ Доступ заборонено.');
       return;
     }
 
@@ -635,12 +873,12 @@ export function createLawyerBot(opts: BotOptions): Bot {
     ]);
 
     await ctx.reply(
-      '\u{1F527} \u0410\u0434\u043C\u0456\u043D \u043F\u0430\u043D\u0435\u043B\u044C\n\n' +
-      `\u{1F464} \u041A\u043E\u0440\u0438\u0441\u0442\u0443\u0432\u0430\u0447\u0456\u0432: ${userCount}\n` +
-      `\u{1F3DB}\uFE0F \u041E\u0440\u0433\u0430\u043D\u0456\u0437\u0430\u0446\u0456\u0439: ${orgCount}\n` +
-      `\u{1F4C1} \u0421\u043F\u0440\u0430\u0432: ${caseCount}\n` +
-      `\u{1F4E6} \u041F\u0456\u0434\u043F\u0438\u0441\u043E\u043A: ${subCount}\n` +
-      `\u{1F381} \u0410\u043A\u0442\u0438\u0432\u043D\u0438\u0445 \u0442\u0440\u0456\u0430\u043B\u0456\u0432: ${activeTrials}`,
+      '🔧 Адмін панель\n\n' +
+      `👤 Користувачів: ${userCount}\n` +
+      `🏛️ Організацій: ${orgCount}\n` +
+      `📁 Справ: ${caseCount}\n` +
+      `📦 Підписок: ${subCount}\n` +
+      `🎁 Активних тріалів: ${activeTrials}`,
     );
   });
 
@@ -651,12 +889,15 @@ export function createLawyerBot(opts: BotOptions): Bot {
   return bot as unknown as Bot;
 }
 
+// ═══════════════════════════════════════════════════════════════
 // ─── Client Bot ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 export function createClientBot(opts: BotOptions): Bot {
-  const { token, miniAppUrl, superadminTelegramId } = opts;
+  const { token, miniAppUrl, superadminTelegramId, lawyerBotToken } = opts;
   const bot = new Bot<BotContext>(token);
   bot.use(session({ initial: initialSession }));
 
+  // ── /start ──
   bot.command('start', async (ctx) => {
     const telegramId = BigInt(ctx.from!.id);
     const sa = isSuperadmin(telegramId, superadminTelegramId);
@@ -668,41 +909,59 @@ export function createClientBot(opts: BotOptions): Bot {
     });
 
     if (existing) {
+      // Already registered — show client menu + Mini App
       const keyboard = new InlineKeyboard()
-        .text('\u{1F4DD} \u0417\u0430\u043B\u0438\u0448\u0438\u0442\u0438 \u0437\u0430\u044F\u0432\u043A\u0443', 'c:intake')
-        .text('\u{1F4C5} \u0417\u0430\u043F\u0438\u0441\u0430\u0442\u0438\u0441\u044C', 'c:book').row()
-        .text('\u{1F4CB} \u041C\u043E\u0457 \u0441\u043F\u0440\u0430\u0432\u0438', 'c:cases')
-        .text('\u{1F4CE} \u0417\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0438\u0442\u0438 \u0444\u0430\u0439\u043B', 'c:upload').row()
-        .text('\u{1F4AC} \u041D\u0430\u043F\u0438\u0441\u0430\u0442\u0438 \u0430\u0434\u0432\u043E\u043A\u0430\u0442\u0443', 'c:msg')
-        .text('\u2139\uFE0F \u041F\u0440\u043E \u043D\u0430\u0441', 'c:about');
+        .text('📝 Залишити заявку', 'c:intake')
+        .text('📅 Записатись', 'c:book').row()
+        .text('📋 Мої справи', 'c:cases')
+        .text('📎 Завантажити файл', 'c:upload').row()
+        .text('💬 Написати адвокату', 'c:msg')
+        .text('ℹ️ Про нас', 'c:about');
 
       await ctx.reply(
-        `<b>\u{1F44B} \u041B\u0430\u0441\u043A\u0430\u0432\u043E \u043F\u0440\u043E\u0441\u0438\u043C\u043E \u0434\u043E \u042E\u0440\u0411\u043E\u0442!</b>\n` +
-        `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n` +
-        `\u0412\u0430\u0448 \u0446\u0438\u0444\u0440\u043E\u0432\u0438\u0439 \u044E\u0440\u0438\u0434\u0438\u0447\u043D\u0438\u0439 \u0430\u0441\u0438\u0441\u0442\u0435\u043D\u0442`,
+        `<b>👋 Ласкаво просимо до ЮрБот!</b>\n` +
+        `━━━━━━━━━━━━━━━━━\n` +
+        `Ваш цифровий юридичний асистент`,
         { parse_mode: 'HTML', reply_markup: keyboard },
       );
+
+      if (miniAppUrl) {
+        await ctx.reply('📱 Відкрийте Mini App для повного доступу:', {
+          reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот'),
+        });
+      }
       return;
     }
 
+    // Not registered
     if (!startParam && !sa) {
+      // No invite token — show welcome with explanation
       await ctx.reply(
-        '\u2757 \u0414\u043B\u044F \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u0457 \u043F\u043E\u0442\u0440\u0456\u0431\u043D\u0435 \u043F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F \u0432\u0456\u0434 \u0430\u0434\u0432\u043E\u043A\u0430\u0442\u0430.\n\n' +
-        '\u0417\u0432\u0435\u0440\u043D\u0456\u0442\u044C\u0441\u044F \u0434\u043E \u0432\u0430\u0448\u043E\u0433\u043E \u0430\u0434\u0432\u043E\u043A\u0430\u0442\u0430 \u0434\u043B\u044F \u043E\u0442\u0440\u0438\u043C\u0430\u043D\u043D\u044F \u0437\u0430\u043F\u0440\u043E\u0448\u0435\u043D\u043D\u044F.',
+        `<b>👋 Ласкаво просимо до ЮрБот!</b>\n` +
+        `━━━━━━━━━━━━━━━━━\n\n` +
+        `🔒 Для реєстрації потрібне посилання від адвоката.\n\n` +
+        `Зверніться до вашого адвоката для отримання запрошення.`,
+        { parse_mode: 'HTML' },
       );
       return;
     }
 
     if (sa && !startParam) {
-      ctx.session.step = 'awaiting_name';
-      ctx.session.tokenData = undefined;
+      // Superadmin without token — show "Почати" button
       await ctx.reply(
-        '\u{1F451} SUPERADMIN \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u044F \u0431\u0435\u0437 \u0456\u043D\u0432\u0430\u0439\u0442\u0443.\n\n' +
-        '\u0412\u043A\u0430\u0436\u0456\u0442\u044C \u0432\u0430\u0448\u0435 \u043F\u043E\u0432\u043D\u0435 \u0456\u043C\'\u044F:',
+        `<b>👋 ЮрБот — Клієнтський бот</b>\n` +
+        `━━━━━━━━━━━━━━━━━\n\n` +
+        `👑 <i>SUPERADMIN розпізнано</i>\n\n` +
+        `Реєстрація без запрошення.`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: new InlineKeyboard().text('▶️ Почати', 'onboard:start'),
+        },
       );
       return;
     }
 
+    // Has invite token
     if (startParam) {
       const tokenRecord = await prisma.inviteToken.findUnique({
         where: { token: startParam },
@@ -710,23 +969,23 @@ export function createClientBot(opts: BotOptions): Bot {
       });
 
       if (!tokenRecord || !tokenRecord.isActive) {
-        await ctx.reply('\u274C \u041F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F \u043D\u0435\u0434\u0456\u0439\u0441\u043D\u0435 \u0430\u0431\u043E \u043F\u0440\u043E\u0442\u0435\u0440\u043C\u0456\u043D\u043E\u0432\u0430\u043D\u0435.\n\n\u0417\u0432\u0435\u0440\u043D\u0456\u0442\u044C\u0441\u044F \u0434\u043E \u0430\u0434\u0432\u043E\u043A\u0430\u0442\u0430 \u0437\u0430 \u043D\u043E\u0432\u0438\u043C \u043F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F\u043C.');
+        await ctx.reply('❌ Посилання недійсне або протерміноване.\n\nЗверніться до адвоката за новим посиланням.');
         return;
       }
 
       if (tokenRecord.expiresAt && tokenRecord.expiresAt < new Date()) {
-        await ctx.reply('\u274C \u041F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F \u043F\u0440\u043E\u0442\u0435\u0440\u043C\u0456\u043D\u043E\u0432\u0430\u043D\u0435.');
+        await ctx.reply('❌ Посилання протерміноване.');
         return;
       }
 
       if (tokenRecord.maxUses && tokenRecord.usageCount >= tokenRecord.maxUses) {
-        await ctx.reply('\u274C \u041F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F \u0432\u0438\u0447\u0435\u0440\u043F\u0430\u043D\u043E.');
+        await ctx.reply('❌ Посилання вичерпано.');
         return;
       }
 
-      const lawyerName = tokenRecord.lawyer?.user?.name ?? '\u0412\u0430\u0448 \u0430\u0434\u0432\u043E\u043A\u0430\u0442';
+      const lawyerName = tokenRecord.lawyer?.user?.name ?? 'Ваш адвокат';
 
-      ctx.session.step = 'awaiting_name';
+      // Store token data in session
       ctx.session.tokenData = {
         tokenId: tokenRecord.id,
         orgId: tokenRecord.orgId,
@@ -734,37 +993,80 @@ export function createClientBot(opts: BotOptions): Bot {
         caseId: tokenRecord.caseId ?? undefined,
       };
 
+      // Show welcome with "Почати" button
       await ctx.reply(
-        '\u{1F44B} \u041B\u0430\u0441\u043A\u0430\u0432\u043E \u043F\u0440\u043E\u0441\u0438\u043C\u043E \u0434\u043E \u042E\u0440\u0411\u043E\u0442!\n\n' +
-        '\u0412\u0430\u0441 \u0437\u0430\u043F\u0440\u043E\u0441\u0438\u0432 \u0430\u0434\u0432\u043E\u043A\u0430\u0442: ' + lawyerName + '\n\n' +
-        '\u0412\u043A\u0430\u0436\u0456\u0442\u044C \u0432\u0430\u0448\u0435 \u043F\u043E\u0432\u043D\u0435 \u0456\u043C\'\u044F:',
+        `<b>👋 Ласкаво просимо до ЮрБот!</b>\n` +
+        `━━━━━━━━━━━━━━━━━\n\n` +
+        `Вас запросив адвокат: <b>${lawyerName}</b>\n\n` +
+        `🔐 Безпечна платформа для:\n` +
+        `• Відстеження справ\n` +
+        `• Запис на консультації\n` +
+        `• Обмін документами\n` +
+        `• Зв'язок з адвокатом`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: new InlineKeyboard().text('▶️ Почати', 'onboard:start'),
+        },
       );
     }
   });
 
+  // ── Onboarding step 1: "Почати" pressed ──
+  bot.callbackQuery('onboard:start', async (ctx) => {
+    await ctx.answerCallbackQuery();
+
+    await ctx.editMessageText(
+      `<b>📝 Реєстрація клієнта</b>\n` +
+      `━━━━━━━━━━━━━━━━━\n\n` +
+      `Реєстрація займе менше хвилини.\n\n` +
+      `Ви отримаєте:\n` +
+      `✅ Особистий кабінет\n` +
+      `✅ Зв'язок з адвокатом\n` +
+      `✅ Доступ до Mini App`,
+      {
+        parse_mode: 'HTML',
+        reply_markup: new InlineKeyboard().text('📝 Зареєструватися', 'onboard:register'),
+      },
+    );
+  });
+
+  // ── Onboarding step 2: "Зареєструватися" pressed ──
+  bot.callbackQuery('onboard:register', async (ctx) => {
+    await ctx.answerCallbackQuery();
+    ctx.session.step = 'awaiting_name';
+
+    await ctx.editMessageText(
+      `<b>📝 Крок 1 з 2 — Ваше ім'я</b>\n` +
+      `━━━━━━━━━━━━━━━━━\n\n` +
+      `Введіть ваше повне ім'я:`,
+      { parse_mode: 'HTML' },
+    );
+  });
+
+  // ── Text message handler (name, phone) ──
   bot.on('message:text', async (ctx) => {
     const { step } = ctx.session;
 
     if (step === 'awaiting_reset_confirm') {
       const text = ctx.message.text.trim().toLowerCase();
-      if (text === '\u0442\u0430\u043A' || text === 'yes') {
+      if (text === 'так' || text === 'yes') {
         const telegramId = BigInt(ctx.from!.id);
         try {
           const deleted = await deleteUserByTelegramId(telegramId);
           ctx.session.step = 'idle';
           if (deleted) {
-            await ctx.reply('\u{1F5D1} \u0414\u0430\u043D\u0456 \u0432\u0438\u0434\u0430\u043B\u0435\u043D\u043E. \u041F\u043E\u043F\u0440\u043E\u0441\u0456\u0442\u044C \u0430\u0434\u0432\u043E\u043A\u0430\u0442\u0430 \u043D\u0430\u0434\u0456\u0441\u043B\u0430\u0442\u0438 \u043D\u043E\u0432\u0435 \u043F\u043E\u0441\u0438\u043B\u0430\u043D\u043D\u044F.');
+            await ctx.reply('🗑 Дані видалено. Попросіть адвоката надіслати нове посилання.');
           } else {
-            await ctx.reply('\u274C \u0414\u0430\u043D\u0456 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E.');
+            await ctx.reply('❌ Дані не знайдено.');
           }
         } catch (err) {
           console.error('[Client Bot] Reset error:', err);
           ctx.session.step = 'idle';
-          await ctx.reply('\u274C \u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043F\u0440\u0438 \u0432\u0438\u0434\u0430\u043B\u0435\u043D\u043D\u0456.');
+          await ctx.reply('❌ Помилка при видаленні.');
         }
       } else {
         ctx.session.step = 'idle';
-        await ctx.reply('\u0421\u043A\u0430\u0441\u043E\u0432\u0430\u043D\u043E.');
+        await ctx.reply('Скасовано.');
       }
       return;
     }
@@ -772,19 +1074,25 @@ export function createClientBot(opts: BotOptions): Bot {
     if (step === 'awaiting_name') {
       const name = ctx.message.text.trim();
       if (name.length < 2 || name.length > 100) {
-        await ctx.reply('\u0412\u043A\u0430\u0436\u0456\u0442\u044C \u043A\u043E\u0440\u0435\u043A\u0442\u043D\u0435 \u0456\u043C\'\u044F (2\u2013100 \u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432):');
+        await ctx.reply('Вкажіть коректне ім\'я (2–100 символів):');
         return;
       }
       ctx.session.name = name;
       ctx.session.step = 'awaiting_phone';
-      await ctx.reply('\u0414\u044F\u043A\u0443\u044E, ' + name + '!\n\n\u0422\u0435\u043F\u0435\u0440 \u0432\u043A\u0430\u0436\u0456\u0442\u044C \u0432\u0430\u0448 \u043D\u043E\u043C\u0435\u0440 \u0442\u0435\u043B\u0435\u0444\u043E\u043D\u0443:');
+      await ctx.reply(
+        `<b>📝 Крок 2 з 2 — Телефон</b>\n` +
+        `━━━━━━━━━━━━━━━━━\n\n` +
+        `Дякую, ${name}!\n\n` +
+        `Вкажіть ваш номер телефону:`,
+        { parse_mode: 'HTML' },
+      );
       return;
     }
 
     if (step === 'awaiting_phone') {
       const phone = ctx.message.text.trim().replace(/[\s\-()]/g, '');
       if (!/^\+?\d{10,15}$/.test(phone)) {
-        await ctx.reply('\u041D\u0435\u043A\u043E\u0440\u0435\u043A\u0442\u043D\u0438\u0439 \u043D\u043E\u043C\u0435\u0440. \u0412\u043A\u0430\u0436\u0456\u0442\u044C \u0443 \u0444\u043E\u0440\u043C\u0430\u0442\u0456 +380991234567:');
+        await ctx.reply('Некоректний номер. Вкажіть у форматі +380991234567:');
         return;
       }
 
@@ -800,7 +1108,7 @@ export function createClientBot(opts: BotOptions): Bot {
           });
 
           if (sa && !tokenData) {
-            const orgName = name + ' \u2014 \u041A\u043B\u0456\u0454\u043D\u0442\u0441\u044C\u043A\u0438\u0439 \u0430\u043A\u043A\u0430\u0443\u043D\u0442';
+            const orgName = name + ' — Клієнтський аккаунт';
             const org = await tx.organization.create({
               data: { name: orgName, slug: slugify(orgName) },
             });
@@ -836,61 +1144,75 @@ export function createClientBot(opts: BotOptions): Bot {
         ctx.session.step = 'idle';
 
         await ctx.reply(
-          '\u2705 \u0420\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u044E \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E!\n\n' +
-          (sa ? '\u{1F451} SUPERADMIN \u0434\u043E\u0441\u0442\u0443\u043F \u0430\u043A\u0442\u0438\u0432\u043E\u0432\u0430\u043D\u043E.\n\n' : '\u0412\u0430\u0448 \u0430\u0434\u0432\u043E\u043A\u0430\u0442 \u043E\u0442\u0440\u0438\u043C\u0430\u0454 \u0441\u043F\u043E\u0432\u0456\u0449\u0435\u043D\u043D\u044F.\n\n'),
+          `<b>✅ Реєстрацію завершено!</b>\n` +
+          `━━━━━━━━━━━━━━━━━\n\n` +
+          `👤 ${name}\n` +
+          (sa ? '👑 SUPERADMIN доступ активовано.\n\n' : 'Ваш адвокат отримає сповіщення.\n\n'),
+          { parse_mode: 'HTML' },
         );
 
-        // Show the client interface after registration
+        // Show client menu
         const clientKeyboard = new InlineKeyboard()
-          .text('\u{1F4DD} \u0417\u0430\u043B\u0438\u0448\u0438\u0442\u0438 \u0437\u0430\u044F\u0432\u043A\u0443', 'c:intake')
-          .text('\u{1F4C5} \u0417\u0430\u043F\u0438\u0441\u0430\u0442\u0438\u0441\u044C', 'c:book').row()
-          .text('\u{1F4CB} \u041C\u043E\u0457 \u0441\u043F\u0440\u0430\u0432\u0438', 'c:cases')
-          .text('\u{1F4CE} \u0417\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0438\u0442\u0438 \u0444\u0430\u0439\u043B', 'c:upload').row()
-          .text('\u{1F4AC} \u041D\u0430\u043F\u0438\u0441\u0430\u0442\u0438 \u0430\u0434\u0432\u043E\u043A\u0430\u0442\u0443', 'c:msg')
-          .text('\u2139\uFE0F \u041F\u0440\u043E \u043D\u0430\u0441', 'c:about');
+          .text('📝 Залишити заявку', 'c:intake')
+          .text('📅 Записатись', 'c:book').row()
+          .text('📋 Мої справи', 'c:cases')
+          .text('📎 Завантажити файл', 'c:upload').row()
+          .text('💬 Написати адвокату', 'c:msg')
+          .text('ℹ️ Про нас', 'c:about');
 
         await ctx.reply(
-          `<b>\u{1F44B} \u041B\u0430\u0441\u043A\u0430\u0432\u043E \u043F\u0440\u043E\u0441\u0438\u043C\u043E \u0434\u043E \u042E\u0440\u0411\u043E\u0442!</b>\n` +
-          `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n` +
-          `\u0412\u0430\u0448 \u0446\u0438\u0444\u0440\u043E\u0432\u0438\u0439 \u044E\u0440\u0438\u0434\u0438\u0447\u043D\u0438\u0439 \u0430\u0441\u0438\u0441\u0442\u0435\u043D\u0442`,
+          `<b>👋 Ласкаво просимо до ЮрБот!</b>\n` +
+          `━━━━━━━━━━━━━━━━━\n` +
+          `Ваш цифровий юридичний асистент`,
           { parse_mode: 'HTML', reply_markup: clientKeyboard },
         );
 
+        // Open Mini App
         if (miniAppUrl) {
+          await ctx.reply('📱 Відкрийте Mini App для повного доступу:', {
+            reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот'),
+          });
+
           try {
             await bot.api.setChatMenuButton({
               chat_id: Number(telegramId),
-              menu_button: { type: 'web_app', text: '\u{1F4BC} \u042E\u0440\u0411\u043E\u0442', web_app: { url: miniAppUrl } },
+              menu_button: { type: 'web_app', text: '💼 ЮрБот', web_app: { url: miniAppUrl } },
             });
           } catch (e) {
             console.warn('[Client Bot] Failed to set menu button:', e);
           }
         }
+
+        // Notify lawyer about new client
+        if (tokenData) {
+          notifyLawyerAboutClient(lawyerBotToken, tokenData.lawyerId, name, phone).catch(() => {});
+        }
       } catch (err) {
         console.error('[Client Bot] Onboarding error:', err);
         ctx.session.step = 'idle';
-        await ctx.reply('\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043F\u0440\u0438 \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u0457. \u0421\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0449\u0435 \u0440\u0430\u0437.');
+        await ctx.reply('Помилка при реєстрації. Спробуйте ще раз.');
       }
       return;
     }
 
-    await ctx.reply('\u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0439\u0442\u0435 /help \u0434\u043B\u044F \u0441\u043F\u0438\u0441\u043A\u0443 \u043A\u043E\u043C\u0430\u043D\u0434.');
+    await ctx.reply('Використовуйте /help для списку команд.');
   });
 
+  // ── Commands ──
   bot.command('help', async (ctx) => {
     const telegramId = BigInt(ctx.from!.id);
     const sa = isSuperadmin(telegramId, superadminTelegramId);
 
     let text =
-      '\u{1F4CB} \u0414\u043E\u0441\u0442\u0443\u043F\u043D\u0456 \u043A\u043E\u043C\u0430\u043D\u0434\u0438:\n\n' +
-      '/start \u2014 \u0413\u043E\u043B\u043E\u0432\u043D\u0435 \u043C\u0435\u043D\u044E\n' +
-      '/status \u2014 \u0421\u0442\u0430\u0442\u0443\u0441 \u043C\u043E\u0454\u0457 \u0441\u043F\u0440\u0430\u0432\u0438\n' +
-      '/appointments \u2014 \u041C\u043E\u0457 \u0437\u0430\u043F\u0438\u0441\u0438\n' +
-      '/admin \u2014 \u0406\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0456\u044F \u043F\u0440\u043E \u043E\u0431\u043B\u0456\u043A\u043E\u0432\u0438\u0439 \u0437\u0430\u043F\u0438\u0441\n' +
-      '/reset \u2014 \u0421\u043A\u0438\u043D\u0443\u0442\u0438 \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u044E';
+      '📋 Доступні команди:\n\n' +
+      '/start — Головне меню\n' +
+      '/status — Статус моєї справи\n' +
+      '/appointments — Мої записи\n' +
+      '/admin — Інформація про обліковий запис\n' +
+      '/reset — Скинути реєстрацію';
 
     if (sa) {
-      text += '\n\n\u{1F451} Superadmin:\n/stats \u2014 \u0421\u0438\u0441\u0442\u0435\u043C\u043D\u0430 \u0441\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430';
+      text += '\n\n👑 Superadmin:\n/stats — Системна статистика';
     }
 
     await ctx.reply(text);
@@ -905,7 +1227,7 @@ export function createClientBot(opts: BotOptions): Bot {
     });
 
     if (!identity) {
-      await ctx.reply('\u274C \u0412\u0438 \u043D\u0435 \u0437\u0430\u0440\u0435\u0454\u0441\u0442\u0440\u043E\u0432\u0430\u043D\u0456.');
+      await ctx.reply('❌ Ви не зареєстровані.');
       return;
     }
 
@@ -914,16 +1236,16 @@ export function createClientBot(opts: BotOptions): Bot {
     const org = profile?.orgId ? await prisma.organization.findUnique({ where: { id: profile.orgId } }) : null;
 
     const lines = [
-      '\u{1F464} \u041C\u0456\u0439 \u043E\u0431\u043B\u0456\u043A\u043E\u0432\u0438\u0439 \u0437\u0430\u043F\u0438\u0441' + (sa ? ' \u{1F451} SUPERADMIN' : '') + '\n',
-      '\u{1F4CC} Telegram ID: ' + ctx.from!.id,
-      '\u{1F4E7} \u0406\u043C\'\u044F: ' + user.name,
-      '\u{1F4F1} \u0422\u0435\u043B\u0435\u0444\u043E\u043D: ' + (user.phone || '\u2014'),
-      '\u{1F3DB}\uFE0F \u041E\u0440\u0433\u0430\u043D\u0456\u0437\u0430\u0446\u0456\u044F: ' + (org?.name || '\u2014'),
-      '\u{1F511} \u041A\u043E\u0434 \u0434\u043E\u0441\u0442\u0443\u043F\u0443: ' + (profile?.accessCode || '\u2014'),
+      '👤 Мій обліковий запис' + (sa ? ' 👑 SUPERADMIN' : '') + '\n',
+      '📌 Telegram ID: ' + ctx.from!.id,
+      '📧 Ім\'я: ' + user.name,
+      '📱 Телефон: ' + (user.phone || '—'),
+      '🏛️ Організація: ' + (org?.name || '—'),
+      '🔑 Код доступу: ' + (profile?.accessCode || '—'),
     ];
 
     if (sa) {
-      lines.push('\u267E\uFE0F \u041F\u043E\u0432\u043D\u0438\u0439 \u0434\u043E\u0441\u0442\u0443\u043F \u0431\u0435\u0437 \u043E\u0431\u043C\u0435\u0436\u0435\u043D\u044C');
+      lines.push('♾️ Повний доступ без обмежень');
     }
 
     await ctx.reply(lines.join('\n'));
@@ -932,7 +1254,7 @@ export function createClientBot(opts: BotOptions): Bot {
   bot.command('stats', async (ctx) => {
     const telegramId = BigInt(ctx.from!.id);
     if (!isSuperadmin(telegramId, superadminTelegramId)) {
-      await ctx.reply('\u274C \u0414\u043E\u0441\u0442\u0443\u043F \u0437\u0430\u0431\u043E\u0440\u043E\u043D\u0435\u043D\u043E.');
+      await ctx.reply('❌ Доступ заборонено.');
       return;
     }
 
@@ -945,27 +1267,27 @@ export function createClientBot(opts: BotOptions): Bot {
     ]);
 
     await ctx.reply(
-      '\u{1F451} \u0421\u0438\u0441\u0442\u0435\u043C\u043D\u0430 \u0441\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430:\n\n' +
-      '\u{1F464} \u041A\u043E\u0440\u0438\u0441\u0442\u0443\u0432\u0430\u0447\u0456\u0432: ' + userCount + '\n' +
-      '\u{1F3DB}\uFE0F \u041E\u0440\u0433\u0430\u043D\u0456\u0437\u0430\u0446\u0456\u0439: ' + orgCount + '\n' +
-      '\u{1F4C1} \u0421\u043F\u0440\u0430\u0432: ' + caseCount + '\n' +
-      '\u{1F4E6} \u041F\u0456\u0434\u043F\u0438\u0441\u043E\u043A: ' + subCount + '\n' +
-      '\u{1F381} \u0410\u043A\u0442\u0438\u0432\u043D\u0438\u0445 \u0442\u0440\u0456\u0430\u043B\u0456\u0432: ' + activeTrials,
+      '👑 Системна статистика:\n\n' +
+      '👤 Користувачів: ' + userCount + '\n' +
+      '🏛️ Організацій: ' + orgCount + '\n' +
+      '📁 Справ: ' + caseCount + '\n' +
+      '📦 Підписок: ' + subCount + '\n' +
+      '🎁 Активних тріалів: ' + activeTrials,
     );
   });
 
   bot.command('reset', async (ctx) => {
     ctx.session.step = 'awaiting_reset_confirm';
     await ctx.reply(
-      '\u26A0\uFE0F \u0412\u0438 \u0432\u043F\u0435\u0432\u043D\u0435\u043D\u0456 \u0449\u043E \u0445\u043E\u0447\u0435\u0442\u0435 \u0432\u0438\u0434\u0430\u043B\u0438\u0442\u0438 \u0441\u0432\u043E\u0457 \u0434\u0430\u043D\u0456?\n\n' +
-      '\u041D\u0430\u043F\u0438\u0448\u0456\u0442\u044C "\u0442\u0430\u043A" \u0434\u043B\u044F \u043F\u0456\u0434\u0442\u0432\u0435\u0440\u0434\u0436\u0435\u043D\u043D\u044F:',
+      '⚠️ Ви впевнені що хочете видалити свої дані?\n\n' +
+      'Напишіть "так" для підтвердження:',
     );
   });
 
   bot.command('status', async (ctx) => {
     const telegramId = BigInt(ctx.from!.id);
     const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId } });
-    if (!identity) { await ctx.reply('\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043F\u0440\u043E\u0439\u0434\u0456\u0442\u044C \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u044E.'); return; }
+    if (!identity) { await ctx.reply('Спочатку пройдіть реєстрацію.'); return; }
 
     const profile = await prisma.clientProfile.findUnique({ where: { userId: identity.userId } });
     if (!profile) return;
@@ -977,18 +1299,18 @@ export function createClientBot(opts: BotOptions): Bot {
     });
 
     if (activeCases.length === 0) {
-      await ctx.reply('\u{1F4C4} \u0423 \u0432\u0430\u0441 \u043F\u043E\u043A\u0438 \u043D\u0435\u043C\u0430\u0454 \u0430\u043A\u0442\u0438\u0432\u043D\u0438\u0445 \u0441\u043F\u0440\u0430\u0432.');
+      await ctx.reply('📄 У вас поки немає активних справ.');
       return;
     }
 
     const lines = activeCases.map((c, i) => (i + 1) + '. ' + c.title + ' [' + c.status + ']');
-    await ctx.reply('\u{1F4CA} \u0412\u0430\u0448\u0456 \u0441\u043F\u0440\u0430\u0432\u0438:\n\n' + lines.join('\n'));
+    await ctx.reply('📊 Ваші справи:\n\n' + lines.join('\n'));
   });
 
   bot.command('appointments', async (ctx) => {
     const telegramId = BigInt(ctx.from!.id);
     const identity = await prisma.telegramIdentity.findFirst({ where: { telegramId } });
-    if (!identity) { await ctx.reply('\u0421\u043F\u043E\u0447\u0430\u0442\u043A\u0443 \u043F\u0440\u043E\u0439\u0434\u0456\u0442\u044C \u0440\u0435\u0454\u0441\u0442\u0440\u0430\u0446\u0456\u044E.'); return; }
+    if (!identity) { await ctx.reply('Спочатку пройдіть реєстрацію.'); return; }
 
     const profile = await prisma.clientProfile.findUnique({ where: { userId: identity.userId } });
     if (!profile) return;
@@ -1000,27 +1322,39 @@ export function createClientBot(opts: BotOptions): Bot {
     });
 
     if (upcoming.length === 0) {
-      await ctx.reply('\u{1F4C5} \u041D\u0435\u043C\u0430\u0454 \u043C\u0430\u0439\u0431\u0443\u0442\u043D\u0456\u0445 \u0437\u0430\u043F\u0438\u0441\u0456\u0432.');
+      await ctx.reply('📅 Немає майбутніх записів.');
       return;
     }
 
     const lines = upcoming.map((a) => {
       const date = a.date.toLocaleDateString('uk-UA');
       const time = a.date.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
-      return '\u{1F4C5} ' + date + ' ' + time;
+      return '📅 ' + date + ' ' + time;
     });
-    await ctx.reply('\u{1F4C5} \u0412\u0430\u0448\u0456 \u0437\u0430\u043F\u0438\u0441\u0438:\n\n' + lines.join('\n'));
+    await ctx.reply('📅 Ваші записи:\n\n' + lines.join('\n'));
   });
 
   // ── Callback query handlers ──
   bot.callbackQuery('c:intake', async (ctx) => {
     await ctx.answerCallbackQuery();
-    await ctx.reply('\u{1F4DD} \u0429\u043E\u0431 \u0437\u0430\u043B\u0438\u0448\u0438\u0442\u0438 \u0437\u0430\u044F\u0432\u043A\u0443, \u043E\u043F\u0438\u0448\u0456\u0442\u044C \u0432\u0430\u0448\u0443 \u044E\u0440\u0438\u0434\u0438\u0447\u043D\u0443 \u0441\u0438\u0442\u0443\u0430\u0446\u0456\u044E \u0443 \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u043D\u0456 \u043D\u0438\u0436\u0447\u0435.\n\n\u0410\u0431\u043E \u0441\u043A\u043E\u0440\u0438\u0441\u0442\u0430\u0439\u0442\u0435\u0441\u044C Mini App.');
+    if (miniAppUrl) {
+      await ctx.reply('📝 Залишіть заявку через Mini App:', {
+        reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Нова заявка'),
+      });
+    } else {
+      await ctx.reply('📝 Щоб залишити заявку, опишіть вашу юридичну ситуацію у повідомленні нижче.');
+    }
   });
 
   bot.callbackQuery('c:book', async (ctx) => {
     await ctx.answerCallbackQuery();
-    await ctx.reply('\u{1F4C5} \u0417\u0430\u043F\u0438\u0441 \u043D\u0430 \u043A\u043E\u043D\u0441\u0443\u043B\u044C\u0442\u0430\u0446\u0456\u044E \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0438\u0439 \u0447\u0435\u0440\u0435\u0437 Mini App.\n\n\u0417\u0432\u0435\u0440\u043D\u0456\u0442\u044C\u0441\u044F \u0434\u043E \u0430\u0434\u0432\u043E\u043A\u0430\u0442\u0430 \u0434\u043B\u044F \u0443\u0437\u0433\u043E\u0434\u0436\u0435\u043D\u043D\u044F \u0447\u0430\u0441\u0443.');
+    if (miniAppUrl) {
+      await ctx.reply('📅 Запишіться через Mini App:', {
+        reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Записатись'),
+      });
+    } else {
+      await ctx.reply('📅 Запис на консультацію доступний через Mini App.\n\nЗверніться до адвоката для узгодження часу.');
+    }
   });
 
   bot.callbackQuery('c:cases', async (ctx) => {
@@ -1038,34 +1372,34 @@ export function createClientBot(opts: BotOptions): Bot {
     });
 
     if (activeCases.length === 0) {
-      await ctx.reply('\u{1F4C4} \u0423 \u0432\u0430\u0441 \u043F\u043E\u043A\u0438 \u043D\u0435\u043C\u0430\u0454 \u0430\u043A\u0442\u0438\u0432\u043D\u0438\u0445 \u0441\u043F\u0440\u0430\u0432.');
+      await ctx.reply('📄 У вас поки немає активних справ.');
       return;
     }
 
     const lines = activeCases.map((c, i) => `${i + 1}. ${c.title} [${c.status}]`);
-    await ctx.reply('\u{1F4CA} \u0412\u0430\u0448\u0456 \u0441\u043F\u0440\u0430\u0432\u0438:\n\n' + lines.join('\n'));
+    await ctx.reply('📊 Ваші справи:\n\n' + lines.join('\n'));
   });
 
   bot.callbackQuery('c:upload', async (ctx) => {
     await ctx.answerCallbackQuery();
-    await ctx.reply('\u{1F4CE} \u041D\u0430\u0434\u0456\u0448\u043B\u0456\u0442\u044C \u0444\u0430\u0439\u043B \u0443 \u0446\u0435\u0439 \u0447\u0430\u0442 \u2014 \u0432\u0456\u043D \u0431\u0443\u0434\u0435 \u043F\u0440\u0438\u043A\u0440\u0456\u043F\u043B\u0435\u043D\u0438\u0439 \u0434\u043E \u0432\u0430\u0448\u043E\u0457 \u0441\u043F\u0440\u0430\u0432\u0438.');
+    await ctx.reply('📎 Надішліть файл у цей чат — він буде прикріплений до вашої справи.');
   });
 
   bot.callbackQuery('c:msg', async (ctx) => {
     await ctx.answerCallbackQuery();
-    await ctx.reply('\u{1F4AC} \u041D\u0430\u043F\u0438\u0448\u0456\u0442\u044C \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u043D\u044F \u0443 \u0446\u0435\u0439 \u0447\u0430\u0442 \u2014 \u0430\u0434\u0432\u043E\u043A\u0430\u0442 \u043E\u0442\u0440\u0438\u043C\u0430\u0454 \u0441\u043F\u043E\u0432\u0456\u0449\u0435\u043D\u043D\u044F.');
+    await ctx.reply('💬 Напишіть повідомлення у цей чат — адвокат отримає сповіщення.');
   });
 
   bot.callbackQuery('c:about', async (ctx) => {
     await ctx.answerCallbackQuery();
     await ctx.reply(
-      '\u2139\uFE0F \u042E\u0440\u0411\u043E\u0442 \u2014 \u0446\u0438\u0444\u0440\u043E\u0432\u0438\u0439 \u044E\u0440\u0438\u0434\u0438\u0447\u043D\u0438\u0439 \u0430\u0441\u0438\u0441\u0442\u0435\u043D\u0442\n\n' +
-      '\u041F\u043B\u0430\u0442\u0444\u043E\u0440\u043C\u0430 \u0434\u043B\u044F \u0437\u0432\'\u044F\u0437\u043A\u0443 \u0437 \u0430\u0434\u0432\u043E\u043A\u0430\u0442\u043E\u043C:\n' +
-      '\u2022 \u0412\u0456\u0434\u0441\u0442\u0435\u0436\u0435\u043D\u043D\u044F \u0441\u043F\u0440\u0430\u0432\n' +
-      '\u2022 \u0417\u0430\u043F\u0438\u0441 \u043D\u0430 \u043A\u043E\u043D\u0441\u0443\u043B\u044C\u0442\u0430\u0446\u0456\u0457\n' +
-      '\u2022 \u041E\u0431\u043C\u0456\u043D \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u043C\u0438\n' +
-      '\u2022 \u041F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u043D\u044F\n\n' +
-      '\u00A9 DYVO digital studio \u00B7 2026',
+      'ℹ️ ЮрБот — цифровий юридичний асистент\n\n' +
+      'Платформа для зв\'язку з адвокатом:\n' +
+      '• Відстеження справ\n' +
+      '• Запис на консультації\n' +
+      '• Обмін документами\n' +
+      '• Повідомлення\n\n' +
+      '© DYVO digital studio · 2026',
     );
   });
 
