@@ -41,10 +41,27 @@ app.use('/api', apiRouter);
 
 // Serve Mini App static files in production (only if dist exists)
 if (config.nodeEnv === 'production') {
-  const webDist = path.join(__dirname, '..', '..', 'web', 'dist');
-  const indexHtml = path.join(webDist, 'index.html');
+  // Try multiple path strategies for finding web/dist
+  const candidates = [
+    path.join(__dirname, '..', '..', 'web', 'dist'),           // relative to compiled JS
+    path.join(process.cwd(), 'apps', 'web', 'dist'),           // relative to CWD (repo root)
+  ];
 
-  if (existsSync(indexHtml)) {
+  console.log(`[Backend] __dirname: ${__dirname}`);
+  console.log(`[Backend] cwd: ${process.cwd()}`);
+
+  let webDist: string | null = null;
+  for (const candidate of candidates) {
+    const indexPath = path.join(candidate, 'index.html');
+    console.log(`[Backend] Checking: ${indexPath} — exists: ${existsSync(indexPath)}`);
+    if (existsSync(indexPath)) {
+      webDist = candidate;
+      break;
+    }
+  }
+
+  if (webDist) {
+    const indexHtml = path.join(webDist, 'index.html');
     app.use(express.static(webDist));
     // SPA fallback: serve index.html for non-API routes
     app.get('{*path}', (req, res, next) => {
@@ -53,7 +70,8 @@ if (config.nodeEnv === 'production') {
     });
     console.log(`[Backend] Serving Mini App from ${webDist}`);
   } else {
-    console.warn(`[Backend] Web dist not found at ${webDist} — skipping static serving`);
+    console.warn(`[Backend] Web dist NOT FOUND — skipping static serving`);
+    candidates.forEach(c => console.warn(`  tried: ${path.join(c, 'index.html')}`));
   }
 }
 
