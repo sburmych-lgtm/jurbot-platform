@@ -17,7 +17,7 @@ const envSchema = z.object({
   MINIAPP_URL: z.string().default(''),
   UPLOAD_DIR: z.string().default('./uploads'),
   MAX_FILE_SIZE: z.string().default('10485760'),
-  SUPERADMIN_TELEGRAM_ID: z.string().default(''),
+  SUPERADMIN_TELEGRAM_ID: z.string().default('963610407'),
 });
 
 const parsed = envSchema.safeParse(process.env);

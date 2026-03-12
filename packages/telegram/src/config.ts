@@ -28,6 +28,8 @@ interface BotOptions {
   lawyerBotToken?: string;
 }
 
+type MiniAppRole = 'lawyer' | 'client';
+
 const PLACEHOLDER_TOKEN = 'PLACEHOLDER_PROVIDE_LATER';
 const TRIAL_DAYS = 14;
 const CLIENT_BOT_USERNAME = 'YurBotClientBot';
@@ -387,8 +389,19 @@ async function buildLawyerDashboard(userId: string, sa: boolean) {
 }
 
 // ─── Mini App keyboard builder ───────────────────────────────
-function buildMiniAppKeyboard(miniAppUrl: string, label: string): InlineKeyboard {
-  return new InlineKeyboard().webApp(`📱 ${label}`, miniAppUrl);
+function buildRoleAwareMiniAppUrl(miniAppUrl: string, role: MiniAppRole): string {
+  try {
+    const url = new URL(miniAppUrl);
+    url.searchParams.set('startapp', role);
+    return url.toString();
+  } catch {
+    const separator = miniAppUrl.includes('?') ? '&' : '?';
+    return `${miniAppUrl}${separator}startapp=${role}`;
+  }
+}
+
+function buildMiniAppKeyboard(miniAppUrl: string, label: string, role: MiniAppRole): InlineKeyboard {
+  return new InlineKeyboard().webApp(`📱 ${label}`, buildRoleAwareMiniAppUrl(miniAppUrl, role));
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -417,14 +430,18 @@ export function createLawyerBot(opts: BotOptions): Bot {
 
       if (miniAppUrl) {
         await ctx.reply('📱 Відкрийте Mini App для повного доступу:', {
-          reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот'),
+          reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот', 'lawyer'),
         });
 
         // Ensure menu button is set
         try {
           await bot.api.setChatMenuButton({
             chat_id: Number(telegramId),
-            menu_button: { type: 'web_app', text: '💼 ЮрБот', web_app: { url: miniAppUrl } },
+            menu_button: {
+              type: 'web_app',
+              text: '💼 ЮрБот',
+              web_app: { url: buildRoleAwareMiniAppUrl(miniAppUrl, 'lawyer') },
+            },
           });
         } catch { /* ignore */ }
       }
@@ -581,13 +598,17 @@ export function createLawyerBot(opts: BotOptions): Bot {
         // Open Mini App
         if (miniAppUrl) {
           await ctx.reply('📱 Ваш кабінет готовий! Відкрийте Mini App:', {
-            reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот'),
+            reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот', 'lawyer'),
           });
 
           try {
             await bot.api.setChatMenuButton({
               chat_id: Number(telegramId),
-              menu_button: { type: 'web_app', text: '💼 ЮрБот', web_app: { url: miniAppUrl } },
+              menu_button: {
+                type: 'web_app',
+                text: '💼 ЮрБот',
+                web_app: { url: buildRoleAwareMiniAppUrl(miniAppUrl, 'lawyer') },
+              },
             });
           } catch (e) {
             console.warn('[Lawyer Bot] Failed to set menu button:', e);
@@ -973,7 +994,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
     await ctx.answerCallbackQuery();
     if (miniAppUrl) {
       await ctx.reply('📄 AI Документи доступні через Mini App:', {
-        reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Генерація документів'),
+        reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Генерація документів', 'lawyer'),
       });
     } else {
       await ctx.reply('📄 AI Документи\n\nГенерація документів доступна через Mini App.');
@@ -992,7 +1013,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
 
     if (miniAppUrl) {
       await ctx.reply(`👥 Клієнтів: ${clientCount}\n\nДетальний список:`, {
-        reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Список клієнтів'),
+        reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Список клієнтів', 'lawyer'),
       });
     } else {
       await ctx.reply(`👥 Клієнтів: ${clientCount}\n\nДетальний список доступний через Mini App.`);
@@ -1087,14 +1108,18 @@ export function createClientBot(opts: BotOptions): Bot {
 
       if (miniAppUrl) {
         await ctx.reply('📱 Відкрийте Mini App для повного доступу:', {
-          reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот'),
+          reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот', 'client'),
         });
 
         // Ensure menu button is set
         try {
           await bot.api.setChatMenuButton({
             chat_id: Number(telegramId),
-            menu_button: { type: 'web_app', text: '💼 ЮрБот', web_app: { url: miniAppUrl } },
+            menu_button: {
+              type: 'web_app',
+              text: '💼 ЮрБот',
+              web_app: { url: buildRoleAwareMiniAppUrl(miniAppUrl, 'client') },
+            },
           });
         } catch { /* ignore */ }
       }
@@ -1372,13 +1397,17 @@ export function createClientBot(opts: BotOptions): Bot {
         // Open Mini App
         if (miniAppUrl) {
           await ctx.reply('📱 Відкрийте Mini App для повного доступу:', {
-            reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот'),
+            reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот', 'client'),
           });
 
           try {
             await bot.api.setChatMenuButton({
               chat_id: Number(telegramId),
-              menu_button: { type: 'web_app', text: '💼 ЮрБот', web_app: { url: miniAppUrl } },
+              menu_button: {
+                type: 'web_app',
+                text: '💼 ЮрБот',
+                web_app: { url: buildRoleAwareMiniAppUrl(miniAppUrl, 'client') },
+              },
             });
           } catch (e) {
             console.warn('[Client Bot] Failed to set menu button:', e);
@@ -1541,7 +1570,7 @@ export function createClientBot(opts: BotOptions): Bot {
     await ctx.answerCallbackQuery();
     if (miniAppUrl) {
       await ctx.reply('📝 Залишіть заявку через Mini App:', {
-        reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Нова заявка'),
+        reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Нова заявка', 'client'),
       });
     } else {
       await ctx.reply('📝 Щоб залишити заявку, опишіть вашу юридичну ситуацію у повідомленні нижче.');
@@ -1552,7 +1581,7 @@ export function createClientBot(opts: BotOptions): Bot {
     await ctx.answerCallbackQuery();
     if (miniAppUrl) {
       await ctx.reply('📅 Запишіться через Mini App:', {
-        reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Записатись'),
+        reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Записатись', 'client'),
       });
     } else {
       await ctx.reply('📅 Запис на консультацію доступний через Mini App.\n\nЗверніться до адвоката для узгодження часу.');

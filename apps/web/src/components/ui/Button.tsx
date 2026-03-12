@@ -9,8 +9,8 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants = {
-  primary: 'bg-accent-teal text-bg-primary font-bold hover:bg-accent-teal/90 disabled:bg-bg-elevated disabled:text-text-muted',
-  secondary: 'border border-border-light text-text-primary hover:bg-bg-hover disabled:opacity-50',
+  primary: 'bg-[linear-gradient(135deg,#00c8b4_0%,#5b7cfa_100%)] text-bg-primary font-bold shadow-[0_18px_40px_rgba(0,200,180,0.18)] hover:brightness-110 disabled:bg-bg-elevated disabled:text-text-muted disabled:shadow-none',
+  secondary: 'border border-white/10 bg-white/5 text-text-primary backdrop-blur-md hover:border-white/20 hover:bg-white/8 disabled:opacity-50',
   danger: 'bg-accent-red text-white hover:bg-accent-red/90 disabled:opacity-50',
   ghost: 'text-text-secondary hover:bg-bg-hover disabled:opacity-50',
 };
@@ -33,7 +33,7 @@ export function Button({
   return (
     <button
       className={cn(
-        'font-semibold transition-all flex items-center justify-center gap-2',
+        'flex items-center justify-center gap-2 font-semibold transition-all',
         variants[variant],
         sizes[size],
         loading && 'cursor-wait',

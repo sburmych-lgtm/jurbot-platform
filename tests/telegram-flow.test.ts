@@ -318,7 +318,13 @@ describe('Telegram bot flows', () => {
       orgId: 'org-1',
     });
 
-    const bot = primeBot(createLawyerBot({ token: 'lawyer-token' }), 'YurBotProBot');
+    const bot = primeBot(
+      createLawyerBot({
+        token: 'lawyer-token',
+        miniAppUrl: 'https://app.example.com',
+      }),
+      'YurBotProBot',
+    );
 
     await bot.handleUpdate(commandUpdate('/start', 1001, 'lawyer_user'));
     await bot.handleUpdate(callbackUpdate('onboard:start', 1001, 'lawyer_user'));
@@ -352,6 +358,16 @@ describe('Telegram bot flows', () => {
       (call) => call.method === 'editMessageText' && String(call.body.text).includes('Посилання для клієнтів'),
     );
     expect(inviteMessage?.body.text).toContain('https://t.me/YurBotClientBot?start=inv_testtoken');
+
+    const lawyerMiniAppMessage = telegramApiCalls.find(
+      (call) =>
+        call.method === 'sendMessage' &&
+        JSON.stringify(call.body.reply_markup ?? {}).includes('https://app.example.com'),
+    );
+    expect(JSON.stringify(lawyerMiniAppMessage?.body.reply_markup ?? {})).toContain('startapp=lawyer');
+
+    const lawyerMenuButton = telegramApiCalls.find((call) => call.method === 'setChatMenuButton');
+    expect(JSON.stringify(lawyerMenuButton?.body ?? {})).toContain('startapp=lawyer');
   });
 
   it('binds a client to the inviting lawyer and notifies the lawyer after registration', async () => {
@@ -397,6 +413,7 @@ describe('Telegram bot flows', () => {
       createClientBot({
         token: 'client-token',
         lawyerBotToken: 'lawyer-token',
+        miniAppUrl: 'https://app.example.com',
       }),
       'YurBotClientBot',
     );
@@ -435,6 +452,16 @@ describe('Telegram bot flows', () => {
         }),
       }),
     );
+
+    const clientMiniAppMessage = telegramApiCalls.find(
+      (call) =>
+        call.method === 'sendMessage' &&
+        JSON.stringify(call.body.reply_markup ?? {}).includes('https://app.example.com'),
+    );
+    expect(JSON.stringify(clientMiniAppMessage?.body.reply_markup ?? {})).toContain('startapp=client');
+
+    const clientMenuButton = telegramApiCalls.find((call) => call.method === 'setChatMenuButton');
+    expect(JSON.stringify(clientMenuButton?.body ?? {})).toContain('startapp=client');
   });
 
   it('forwards a client message to the linked lawyer after pressing the message button', async () => {

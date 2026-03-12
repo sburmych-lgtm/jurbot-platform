@@ -42,12 +42,15 @@ export function initTelegramApp() {
  */
 export function getBotSource(): 'lawyer' | 'client' | null {
   try {
-    const startParam = WebApp.initDataUnsafe?.start_param;
-    if (startParam === 'lawyer' || startParam === 'client') return startParam;
+    const candidates = [
+      WebApp.initDataUnsafe?.start_param,
+      new URLSearchParams(window.location.search).get('tgWebAppStartParam'),
+      new URLSearchParams(window.location.search).get('startapp'),
+    ];
 
-    // Fallback: check URL search params (tgWebAppStartParam)
-    const urlParam = new URLSearchParams(window.location.search).get('tgWebAppStartParam');
-    if (urlParam === 'lawyer' || urlParam === 'client') return urlParam;
+    for (const candidate of candidates) {
+      if (candidate === 'lawyer' || candidate === 'client') return candidate;
+    }
   } catch {
     // ignore
   }

@@ -45,16 +45,28 @@ function HomeRedirect() {
   if (!user) {
     // In Telegram: auth already resolved (loading=false) but user not found
     if (isTelegramWebApp()) {
+      const botSource = getBotSource();
+      const roleLabel = botSource === 'lawyer' ? 'адвокатського' : 'клієнтського';
       return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-[#050810] px-6 text-center">
-          <div className="text-4xl mb-4">⚖️</div>
-          <h1 className="text-white text-xl font-bold mb-2">ЮрБот</h1>
-          <p className="text-[#a0aec0] text-base mb-6">
-            Для доступу до Mini App спочатку пройдіть реєстрацію через бота.
-          </p>
-          <p className="text-[#64748b] text-sm">
-            Напишіть <span className="text-[#6c63ff] font-mono">/start</span> боту і завершіть реєстрацію.
-          </p>
+        <div className="min-h-screen px-6 py-10">
+          <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-md items-center justify-center">
+            <div className="glass-panel hero-panel rounded-[30px] p-8 text-center">
+              <p className="section-kicker mb-3">Mini App</p>
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,rgba(91,124,250,0.92),rgba(0,200,180,0.82))] text-2xl text-[#050810] shadow-[0_20px_44px_rgba(0,0,0,0.28)]">
+                ⚖️
+              </div>
+              <h1 className="font-display text-4xl text-text-primary">ЮрБот</h1>
+              <p className="mt-3 text-sm leading-6 text-text-secondary">
+                Для доступу до {roleLabel} Mini App спочатку завершіть реєстрацію через Telegram-бота.
+              </p>
+              <div className="mt-6 rounded-[20px] border border-white/10 bg-white/5 p-4 text-left">
+                <p className="section-kicker mb-2">Що зробити</p>
+                <p className="text-sm text-text-primary">1. Поверніться в бот.</p>
+                <p className="mt-1 text-sm text-text-primary">2. Натисніть <span className="font-semibold text-accent-teal">Почати</span>.</p>
+                <p className="mt-1 text-sm text-text-primary">3. Завершіть реєстрацію і знову відкрийте Mini App.</p>
+              </div>
+            </div>
+          </div>
         </div>
       );
     }
