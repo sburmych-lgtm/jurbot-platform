@@ -272,6 +272,14 @@ export function createLawyerBot(opts: BotOptions): Bot {
         await ctx.reply('📱 Відкрийте Mini App для повного доступу:', {
           reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот'),
         });
+
+        // Ensure menu button is set
+        try {
+          await bot.api.setChatMenuButton({
+            chat_id: Number(telegramId),
+            menu_button: { type: 'web_app', text: '💼 ЮрБот', web_app: { url: miniAppUrl } },
+          });
+        } catch { /* ignore */ }
       }
       return;
     }
@@ -929,6 +937,14 @@ export function createClientBot(opts: BotOptions): Bot {
         await ctx.reply('📱 Відкрийте Mini App для повного доступу:', {
           reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот'),
         });
+
+        // Ensure menu button is set
+        try {
+          await bot.api.setChatMenuButton({
+            chat_id: Number(telegramId),
+            menu_button: { type: 'web_app', text: '💼 ЮрБот', web_app: { url: miniAppUrl } },
+          });
+        } catch { /* ignore */ }
       }
       return;
     }
