@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "prebuild": "npm run build -w packages/shared && npm run build -w packages/db && npm run build -w packages/telegram && cd ../web && npx vite build",
+    "prebuild": "cd ../.. && npm run build -w packages/shared && npm run build -w packages/db && npm run build -w packages/telegram && cd apps/web && npx vite build",
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit"
