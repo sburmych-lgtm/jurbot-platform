@@ -6,8 +6,14 @@ import { validate } from '../middleware/validate.js';
 import { parsePagination } from '../utils/pagination.js';
 import { param } from '../utils/params.js';
 import * as documentService from '../services/document.service.js';
+import { TEMPLATES } from '@jurbot/shared';
 
 export const documentsRouter = Router();
+
+// GET /documents/templates — return available document templates
+documentsRouter.get('/templates', authenticate, requireRole('LAWYER'), (_req, res) => {
+  res.json({ success: true, data: TEMPLATES });
+});
 
 // GET /documents — LAWYER (all), CLIENT (own case docs)
 documentsRouter.get('/', authenticate, async (req, res, next) => {
