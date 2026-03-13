@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { FileText, Sparkles, ArrowLeft } from 'lucide-react';
 import { api } from '@/lib/api';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { DocumentCard } from '@/components/documents/DocumentCard';
 import { TemplateCard } from '@/components/documents/TemplateCard';
@@ -11,7 +10,7 @@ import { DocumentPreview } from '@/components/documents/DocumentPreview';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Spinner } from '@/components/ui/Spinner';
 import { useToast } from '@/components/ui/Toast';
-import type { DocumentTemplate } from '@jurbot/shared';
+import { TEMPLATES, type DocumentTemplate } from '@jurbot/shared';
 
 type ViewState = 'list' | 'templates' | 'form' | 'generating' | 'preview';
 
@@ -26,7 +25,7 @@ interface DocItem {
 export function LawyerDocumentsPage() {
   const [view, setView] = useState<ViewState>('list');
   const [docs, setDocs] = useState<DocItem[]>([]);
-  const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
+  const templates = TEMPLATES;
   const [selectedTemplate, setSelectedTemplate] = useState<DocumentTemplate | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState('');
@@ -43,13 +42,7 @@ export function LawyerDocumentsPage() {
     })();
   }, []);
 
-  const loadTemplates = async () => {
-    try {
-      const res = await api.get<DocumentTemplate[]>('/v1/documents/templates');
-      setTemplates(res.data ?? []);
-    } catch {}
-    setView('templates');
-  };
+  const showTemplates = () => setView('templates');
 
   const selectTemplate = (t: DocumentTemplate) => {
     setSelectedTemplate(t);
@@ -144,7 +137,7 @@ export function LawyerDocumentsPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold text-text-primary">AI Документи</h1>
-          <Button size="sm" onClick={loadTemplates}>
+          <Button size="sm" onClick={showTemplates}>
             <Sparkles size={16} />
             Створити
           </Button>
@@ -156,7 +149,7 @@ export function LawyerDocumentsPage() {
             title="Документів немає"
             description="Створіть перший AI-документ"
             actionLabel="Створити"
-            onAction={loadTemplates}
+            onAction={showTemplates}
           />
         ) : (
           <div className="space-y-3">
