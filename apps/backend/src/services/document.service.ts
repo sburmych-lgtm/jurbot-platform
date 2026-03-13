@@ -1,5 +1,7 @@
 import { prisma } from '@jurbot/db';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AppError } from '../middleware/errorHandler.js';
+import { config } from '../config.js';
 import type { PaginationParams } from '../utils/pagination.js';
 import type { CreateDocumentInput, UpdateDocumentInput, GenerateDocumentInput } from '@jurbot/shared';
 import { TEMPLATES } from '@jurbot/shared';
@@ -102,48 +104,75 @@ export async function generate(input: GenerateDocumentInput) {
     throw new AppError(404, 'Шаблон не знайдено');
   }
 
-  // Verify case exists
-  const caseRecord = await prisma.case.findUnique({ where: { id: input.caseId } });
-  if (!caseRecord || caseRecord.deletedAt) {
-    throw new AppError(404, 'Справу не знайдено');
-  }
-
-  // Generate content by replacing placeholders in a simple text template
-  const content = generateContent(template.id, template.name, input.data);
-
-  return prisma.document.create({
-    data: {
-      name: `${template.name}.pdf`,
-      caseId: input.caseId,
-      type: template.id,
-      content,
-    },
-    include: {
-      case: { select: { id: true, caseNumber: true, title: true } },
-    },
-  });
-}
-
-function generateContent(templateId: string, templateName: string, data: Record<string, string>): string {
-  const date = new Date().toLocaleDateString('uk-UA');
-  const lines: string[] = [];
-
-  lines.push(templateName.toUpperCase());
-  lines.push('');
-  lines.push(`Дата: ${date}`);
-  lines.push('');
-
-  for (const [key, value] of Object.entries(data)) {
-    if (value) {
-      lines.push(`${key}: ${value}`);
+  // Verify case if provided
+  if (input.caseId) {
+    const caseRecord = await prisma.case.findUnique({ where: { id: input.caseId } });
+    if (!caseRecord || caseRecord.deletedAt) {
+      throw new AppError(404, 'Справу не знайдено');
     }
   }
 
-  lines.push('');
-  lines.push('________________________');
-  lines.push('(підпис)');
+  const content = await generateWithGemini(template.name, template.id, input.data);
 
-  return lines.join('\n');
+  // Save to DB only if caseId is provided; otherwise return content without persisting
+  if (input.caseId) {
+    return prisma.document.create({
+      data: {
+        name: `${template.name}.pdf`,
+        caseId: input.caseId,
+        type: template.id,
+        content,
+      },
+      include: {
+        case: { select: { id: true, caseNumber: true, title: true } },
+      },
+    });
+  }
+
+  return { id: crypto.randomUUID(), name: `${template.name}.pdf`, type: template.id, content, status: 'DRAFT', createdAt: new Date().toISOString() };
+}
+
+async function generateWithGemini(
+  templateName: string,
+  templateId: string,
+  data: Record<string, string>,
+): Promise<string> {
+  if (!config.geminiApiKey) {
+    throw new AppError(500, 'AI-генерація тимчасово недоступна: відсутній API ключ');
+  }
+
+  const genAI = new GoogleGenerativeAI(config.geminiApiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+  const fieldsSummary = Object.entries(data)
+    .filter(([, v]) => v)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join('\n');
+
+  const prompt = `Ти — досвідчений український юрист. Згенеруй повний текст юридичного документа українською мовою.
+
+Тип документа: ${templateName} (${templateId})
+Дата: ${new Date().toLocaleDateString('uk-UA')}
+
+Дані від користувача:
+${fieldsSummary}
+
+Вимоги:
+- Документ має бути юридично грамотним відповідно до законодавства України
+- Використовуй офіційний діловий стиль
+- Включи всі необхідні реквізити для цього типу документа
+- Структуруй документ з правильними заголовками та нумерацією
+- В кінці залиш місце для підпису та дати
+- Відповідай ТІЛЬКИ текстом документа, без пояснень чи коментарів`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+
+  if (!text) {
+    throw new AppError(500, 'AI не зміг згенерувати документ. Спробуйте ще раз.');
+  }
+
+  return text;
 }
 
 /** Verify that a CLIENT user has access to a specific document */

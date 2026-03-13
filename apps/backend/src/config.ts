@@ -18,6 +18,7 @@ const envSchema = z.object({
   UPLOAD_DIR: z.string().default('./uploads'),
   MAX_FILE_SIZE: z.string().default('10485760'),
   SUPERADMIN_TELEGRAM_ID: z.string().default('963610407'),
+  GEMINI_API_KEY: z.string().default(''),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -44,4 +45,5 @@ export const config = {
   uploadDir: env.UPLOAD_DIR,
   maxFileSize: parseInt(env.MAX_FILE_SIZE, 10),
   superadminTelegramId: env.SUPERADMIN_TELEGRAM_ID ? BigInt(env.SUPERADMIN_TELEGRAM_ID) : null,
+  geminiApiKey: env.GEMINI_API_KEY,
 } as const;

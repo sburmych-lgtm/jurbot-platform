@@ -10,6 +10,7 @@ import { DynamicForm } from '@/components/documents/DynamicForm';
 import { DocumentPreview } from '@/components/documents/DocumentPreview';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Spinner } from '@/components/ui/Spinner';
+import { useToast } from '@/components/ui/Toast';
 import type { DocumentTemplate } from '@jurbot/shared';
 
 type ViewState = 'list' | 'templates' | 'form' | 'generating' | 'preview';
@@ -30,6 +31,7 @@ export function LawyerDocumentsPage() {
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState('');
   const [loading, setLoading] = useState(true);
+  const { showToast } = useToast();
 
   useEffect(() => {
     (async () => {
@@ -65,7 +67,9 @@ export function LawyerDocumentsPage() {
       });
       setPreview(res.data?.content ?? '');
       setView('preview');
-    } catch {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Не вдалося згенерувати документ';
+      showToast(message);
       setView('form');
     }
   };

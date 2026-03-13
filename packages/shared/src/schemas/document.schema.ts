@@ -13,7 +13,7 @@ export const updateDocumentSchema = z.object({
 });
 export const generateDocumentSchema = z.object({
   templateId: z.string().min(1),
-  caseId: z.string().uuid(),
+  caseId: z.string().uuid().optional(),
   data: z.record(z.string(), z.string()),
 });
 
