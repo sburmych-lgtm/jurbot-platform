@@ -5,10 +5,12 @@ import {
   ArrowRight,
   Briefcase,
   Calendar,
+  CreditCard,
   FileText,
   Inbox,
-  MessageSquareText,
+  Sparkles,
   Users,
+  type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
@@ -23,15 +25,56 @@ interface DashStats {
   cases: number;
   appointments: number;
   intake: number;
+  aiDocs: number;
+  aiDocsLimit: number | null;
+  plan: string | null;
+  subscriptionStatus: string | null;
+  expiresAt: string | null;
 }
 
-const QUICK_LINKS = [
+interface QuickLink {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  path: string;
+  color: string;
+}
+
+interface SubscriptionPayload {
+  subscription: {
+    plan: string;
+    status: string;
+    expiresAt: string | null;
+  } | null;
+  usage: {
+    aiDocsCount: number;
+  } | null;
+  limits: {
+    maxAiDocs: number | null;
+  } | null;
+}
+
+const PLAN_LABELS: Record<string, string> = {
+  TRIAL: 'Trial - 14 днів безкоштовно',
+  BASIC: 'Basic - 499 або 599 грн/міс',
+  PRO: 'Pro - 999 грн/міс',
+  BUREAU: 'Bureau / Business - 2499 грн/міс',
+};
+
+const QUICK_LINKS: QuickLink[] = [
   {
     icon: Inbox,
     title: 'Client Intake',
     description: 'Нові звернення, пріоритет і перший контакт.',
     path: '/lawyer/intake',
     color: 'text-accent-red',
+  },
+  {
+    icon: FileText,
+    title: 'AI Документи',
+    description: 'Генерація шаблонів, договорів, заяв і процесуальних текстів.',
+    path: '/lawyer/documents',
+    color: 'text-accent-blue',
   },
   {
     icon: Briefcase,
@@ -42,191 +85,318 @@ const QUICK_LINKS = [
   },
   {
     icon: Calendar,
-    title: 'Scheduling',
+    title: 'Розклад',
     description: 'Слоти, консультації й календар робочого дня.',
     path: '/lawyer/schedule',
-    color: 'text-accent-blue',
+    color: 'text-accent-amber',
   },
   {
     icon: Users,
-    title: 'Клієнтський контур',
+    title: 'Клієнти',
     description: 'Перегляд підключених клієнтів та їхнього стану.',
     path: '/lawyer/clients',
     color: 'text-accent-amber',
   },
+  {
+    icon: CreditCard,
+    title: 'План і доступ',
+    description: 'Тріал, ліміти, інвайти та тарифна сітка.',
+    path: '/lawyer/settings',
+    color: 'text-accent-blue',
+  },
 ];
+
+const STATUS_LABELS: Record<string, string> = {
+  ACTIVE: 'Активна',
+  TRIAL: 'Тріал',
+  EXPIRED: 'Протермінована',
+  CANCELLED: 'Скасована',
+};
 
 export function LawyerDashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [stats, setStats] = useState<DashStats>({ cases: 0, appointments: 0, intake: 0 });
+  const [stats, setStats] = useState<DashStats>({
+    cases: 0,
+    appointments: 0,
+    intake: 0,
+    aiDocs: 0,
+    aiDocsLimit: null,
+    plan: null,
+    subscriptionStatus: null,
+    expiresAt: null,
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       try {
         const results = await Promise.allSettled([
-          api.get<{ items: unknown[] }>('/v1/cases?limit=0'),
-          api.get<{ items: unknown[] }>('/v1/appointments?limit=0'),
-          api.get<{ items: unknown[] }>('/v1/intake?limit=0'),
+          api.get<{ items?: unknown[] }>('/v1/cases?limit=0'),
+          api.get<{ items?: unknown[] }>('/v1/appointments?limit=0'),
+          api.get<{ items?: unknown[] }>('/v1/intake?limit=0'),
+          api.get<SubscriptionPayload>('/v1/subscription'),
         ]);
 
+        const subscriptionResult =
+          results[3].status === 'fulfilled' ? results[3].value.data : null;
+
         setStats({
-          cases: results[0].status === 'fulfilled' ? (results[0].value.data?.items?.length ?? 0) : 0,
-          appointments: results[1].status === 'fulfilled' ? (results[1].value.data?.items?.length ?? 0) : 0,
-          intake: results[2].status === 'fulfilled' ? (results[2].value.data?.items?.length ?? 0) : 0,
+          cases:
+            results[0].status === 'fulfilled'
+              ? (results[0].value.data?.items?.length ?? 0)
+              : 0,
+          appointments:
+            results[1].status === 'fulfilled'
+              ? (results[1].value.data?.items?.length ?? 0)
+              : 0,
+          intake:
+            results[2].status === 'fulfilled'
+              ? (results[2].value.data?.items?.length ?? 0)
+              : 0,
+          aiDocs: subscriptionResult?.usage?.aiDocsCount ?? 0,
+          aiDocsLimit: subscriptionResult?.limits?.maxAiDocs ?? null,
+          plan: subscriptionResult?.subscription?.plan ?? null,
+          subscriptionStatus: subscriptionResult?.subscription?.status ?? null,
+          expiresAt: subscriptionResult?.subscription?.expiresAt ?? null,
         });
       } catch {
-        // ignore and show zero state
+        // Ignore and keep zero state to avoid blocking the Mini App shell.
       }
 
       setLoading(false);
     })();
   }, []);
 
-  if (loading) return <Spinner />;
+  if (loading) {
+    return (
+      <Spinner
+        text="Завантажуємо dashboard юриста..."
+        subtext="Підтягуємо справи, intake, AI-документи та стан підписки."
+      />
+    );
+  }
 
   const firstName = user?.name?.split(' ')[0] ?? 'Колего';
+  const planLabel = stats.plan ? PLAN_LABELS[stats.plan] ?? stats.plan : 'Trial - 14 днів безкоштовно';
+  const statusLabel = stats.subscriptionStatus
+    ? STATUS_LABELS[stats.subscriptionStatus] ?? stats.subscriptionStatus
+    : 'Тріал';
+  const priorityBadgeColor = stats.intake > 0 ? 'yellow' : 'teal';
+  const aiDocsMeta =
+    stats.aiDocsLimit === null ? 'Без ліміту' : `${stats.aiDocs} / ${stats.aiDocsLimit}`;
+  const daysLeft = stats.expiresAt
+    ? Math.max(
+        0,
+        Math.ceil((new Date(stats.expiresAt).getTime() - Date.now()) / 86400000),
+      )
+    : null;
 
   return (
-    <PageContainer>
-      <div className="space-y-5">
-        <section className="glass-panel hero-panel rounded-[28px] p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="section-kicker mb-2">Операційний центр</p>
-              <h2 className="font-display text-4xl leading-none text-text-primary">Доброго дня, {firstName}.</h2>
-              <p className="mt-3 max-w-md text-sm leading-6 text-text-secondary">
-                Заявки, справи, клієнти та розклад зібрані в одному Mini App, який відкривається прямо з Telegram.
+    <PageContainer className="space-y-6">
+      <Card className="overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(91,124,250,0.28),transparent_45%),linear-gradient(160deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))]">
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.28em] text-text-muted">
+                Операційний центр
               </p>
-            </div>
-            <Badge color={stats.intake > 0 ? 'yellow' : 'teal'}>
-              {stats.intake > 0 ? `${stats.intake} нових` : 'Все під контролем'}
-            </Badge>
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => navigate('/lawyer/intake')}>
-              Нові заявки
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => navigate('/lawyer/cases')}>
-              Справи
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => navigate('/lawyer/clients')}>
-              Клієнти
-            </Button>
-          </div>
-        </section>
-
-        <div className="grid grid-cols-3 gap-3">
-          <StatCard icon={Briefcase} label="Справи" value={stats.cases} />
-          <StatCard icon={Calendar} label="Зустрічі" value={stats.appointments} />
-          <StatCard icon={Inbox} label="Intake" value={stats.intake} />
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-[1.15fr,0.85fr]">
-          <Card className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="section-kicker mb-2">Пріоритет зараз</p>
-                <h3 className="text-lg font-semibold text-text-primary">Фокус на вхідному потоці</h3>
-              </div>
-              {stats.intake > 0 ? <AlertTriangle size={18} className="text-accent-amber" /> : null}
-            </div>
-
-            <div className="space-y-3">
-              <div className="rounded-[18px] border border-accent-red/12 bg-accent-red/8 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-text-primary">
-                      {stats.intake > 0 ? `${stats.intake} заявок очікують на відповідь` : 'Нових заявок зараз немає'}
-                    </p>
-                    <p className="mt-1 text-sm text-text-secondary">
-                      Якщо є нові звернення, відкрийте intake та закрийте їх у першу чергу.
-                    </p>
-                  </div>
-                  <Badge color={stats.intake > 0 ? 'red' : 'teal'}>{stats.intake > 0 ? 'Терміново' : 'Чисто'}</Badge>
-                </div>
-              </div>
-
-              <div className="rounded-[18px] border border-white/8 bg-white/4 p-4">
-                <p className="text-sm font-semibold text-text-primary">Зв'язок з клієнтами вже працює</p>
-                <p className="mt-1 text-sm text-text-secondary">
-                  Клієнтський бот прив’язує нових клієнтів та передає повідомлення адвокату в Telegram.
+              <div className="space-y-2">
+                <h2 className="text-3xl font-semibold text-text-primary">
+                  Доброго дня, {firstName}.
+                </h2>
+                <p className="max-w-xl text-sm leading-6 text-text-secondary">
+                  Заявки, справи, AI-документи, клієнти та доступ до тарифів тепер
+                  зібрані на одному екрані Mini App.
                 </p>
               </div>
             </div>
-          </Card>
 
-          <Card className="space-y-4">
-            <div>
-              <p className="section-kicker mb-2">Сьогодні</p>
-              <h3 className="text-lg font-semibold text-text-primary">Короткий зріз</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge color="blue">{planLabel}</Badge>
+              <Badge color={priorityBadgeColor}>{statusLabel}</Badge>
             </div>
+          </div>
 
-            <div className="space-y-3">
-              <div className="rounded-[18px] border border-white/8 bg-white/4 p-4">
-                <p className="text-sm font-semibold text-text-primary">{stats.appointments} подій у календарі</p>
-                <p className="mt-1 text-sm text-text-secondary">Розклад відкривається окремим розділом без виходу з Mini App.</p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => navigate('/lawyer/documents')}
+              className="glass-panel rounded-[24px] p-4 text-left transition hover:border-white/10 hover:bg-white/5"
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex h-11 w-11 items-center justify-center rounded-[16px] bg-accent-blue/15 text-accent-blue">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <ArrowRight className="h-4 w-4 text-text-muted" />
               </div>
-              <div className="rounded-[18px] border border-white/8 bg-white/4 p-4">
-                <p className="text-sm font-semibold text-text-primary">{stats.cases} справ в активній роботі</p>
-                <p className="mt-1 text-sm text-text-secondary">Статуси, файли та структура вже доступні у web shell.</p>
+
+              <h3 className="text-lg font-semibold text-text-primary">AI Документи</h3>
+              <p className="mt-2 text-sm leading-6 text-text-secondary">
+                Генерація процесуальних шаблонів і документів без виходу з Telegram.
+              </p>
+              <p className="mt-3 text-sm font-medium text-text-primary">{aiDocsMeta}</p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/lawyer/settings')}
+              className="glass-panel rounded-[24px] p-4 text-left transition hover:border-white/10 hover:bg-white/5"
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex h-11 w-11 items-center justify-center rounded-[16px] bg-accent-teal/15 text-accent-teal">
+                  <CreditCard className="h-5 w-5" />
+                </div>
+                <ArrowRight className="h-4 w-4 text-text-muted" />
               </div>
-            </div>
-          </Card>
+
+              <h3 className="text-lg font-semibold text-text-primary">Тріал і тарифи</h3>
+              <p className="mt-2 text-sm leading-6 text-text-secondary">
+                Контроль лімітів, invite token-ів і актуальної комерційної сітки.
+              </p>
+              <p className="mt-3 text-sm font-medium text-text-primary">
+                {daysLeft !== null && stats.subscriptionStatus === 'TRIAL'
+                  ? `Залишилось ${daysLeft} дн.`
+                  : planLabel}
+              </p>
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={() => navigate('/lawyer/documents')}>Відкрити AI Документи</Button>
+            <Button variant="secondary" onClick={() => navigate('/lawyer/settings')}>
+              Переглянути тарифи
+            </Button>
+          </div>
         </div>
+      </Card>
 
-        <section>
-          <p className="section-kicker mb-3">Єдиний контур</p>
-          <div className="grid gap-3">
-            {QUICK_LINKS.map(({ icon: Icon, title, description, path, color }) => (
-              <button
-                key={path}
-                type="button"
-                onClick={() => navigate(path)}
-                className="glass-panel flex items-center gap-4 rounded-[22px] p-4 text-left transition hover:border-white/16 hover:bg-white/6"
-              >
-                <div className={`flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/6 ${color}`}>
-                  <Icon size={20} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-text-primary">{title}</p>
-                  <p className="mt-1 text-sm text-text-secondary">{description}</p>
-                </div>
-                <ArrowRight size={18} className="text-text-muted" />
-              </button>
-            ))}
-          </div>
-        </section>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard icon={Inbox} label="Нові заявки" value={stats.intake} />
+        <StatCard icon={Briefcase} label="Справи" value={stats.cases} />
+        <StatCard icon={Calendar} label="Події в розкладі" value={stats.appointments} />
+        <StatCard icon={FileText} label="AI-документи" value={stats.aiDocs} />
+      </div>
 
-        <Card className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-accent-blue/15 text-accent-blue">
-            <MessageSquareText size={20} />
+      <div className="grid gap-4 xl:grid-cols-[1.3fr_0.9fr]">
+        <Card className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-text-muted">
+                Пріоритет зараз
+              </p>
+              <h3 className="mt-2 text-xl font-semibold text-text-primary">
+                {stats.intake > 0 ? 'Фокус на intake' : 'Операційний контур стабільний'}
+              </h3>
+            </div>
+            <Badge color={stats.intake > 0 ? 'yellow' : 'teal'}>
+              {stats.intake > 0 ? 'Потрібна реакція' : 'Все під контролем'}
+            </Badge>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-text-primary">Запрошення й боти вже з'єднані</p>
-            <p className="mt-1 text-sm text-text-secondary">
-              Клієнт отримує invite link з lawyer bot, реєструється у client bot і після цього потрапляє в цей Mini App.
+
+          <p className="text-sm leading-6 text-text-secondary">
+            {stats.intake > 0
+              ? `Зараз ${stats.intake} заявок очікують на відповідь. Почни з вхідного потоку, а далі переходь до кейсів і документів.`
+              : 'Нових заявок зараз немає. Можна спокійно працювати зі справами, AI-документами та календарем.'}
+          </p>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-[20px] border border-white/10 bg-white/5 p-4">
+              <div className="flex items-center gap-2 text-text-primary">
+                <AlertTriangle className="h-4 w-4 text-accent-amber" />
+                <span className="text-sm font-medium">Intake не губиться</span>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-text-secondary">
+                Клієнтський бот уже прив’язує клієнтів через invite link і одразу
+                шле юристу сповіщення в Telegram.
+              </p>
+            </div>
+
+            <div className="rounded-[20px] border border-white/10 bg-white/5 p-4">
+              <div className="flex items-center gap-2 text-text-primary">
+                <Sparkles className="h-4 w-4 text-accent-blue" />
+                <span className="text-sm font-medium">AI-блок винесено в центр</span>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-text-secondary">
+                Документи більше не заховані в другорядних розділах: вони мають
+                окремий акцент у dashboard і навігації.
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="space-y-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.22em] text-text-muted">
+              План і доступ
             </p>
+            <h3 className="mt-2 text-xl font-semibold text-text-primary">{planLabel}</h3>
           </div>
-          <Button size="sm" variant="secondary" onClick={() => navigate('/lawyer/clients')}>
-            Перевірити
+
+          <p className="text-sm leading-6 text-text-secondary">
+            Trial на 14 днів, Basic 499 або 599 грн/міс, Pro 999 грн/міс, Bureau /
+            Business 2499 грн/міс.
+          </p>
+
+          <div className="space-y-2 rounded-[20px] border border-white/10 bg-white/5 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm text-text-secondary">Поточний статус</span>
+              <Badge color="blue">{statusLabel}</Badge>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm text-text-secondary">AI-документи</span>
+              <span className="text-sm font-medium text-text-primary">{aiDocsMeta}</span>
+            </div>
+            {stats.expiresAt ? (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm text-text-secondary">Діє до</span>
+                <span className="text-sm font-medium text-text-primary">
+                  {new Date(stats.expiresAt).toLocaleDateString('uk-UA')}
+                </span>
+              </div>
+            ) : null}
+          </div>
+
+          <Button variant="secondary" onClick={() => navigate('/lawyer/settings')}>
+            Відкрити розділ підписок
           </Button>
         </Card>
-
-        <Card className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-accent-amber/15 text-accent-amber">
-            <FileText size={20} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-text-primary">Документи та календар лишаються в одному shell</p>
-            <p className="mt-1 text-sm text-text-secondary">
-              Перший зрілий slice уже зібраний, без окремих адмінок і без розриву між ботом та вебчастиною.
-            </p>
-          </div>
-        </Card>
       </div>
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.22em] text-text-muted">
+              Єдиний контур
+            </p>
+            <h3 className="mt-2 text-xl font-semibold text-text-primary">
+              Усі ключові інструменти юриста
+            </h3>
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {QUICK_LINKS.map(({ icon: Icon, title, description, path, color }) => (
+            <button
+              key={path}
+              type="button"
+              onClick={() => navigate(path)}
+              className="glass-panel flex items-center gap-4 rounded-[22px] p-4 text-left transition hover:border-white/10 hover:bg-white/5"
+            >
+              <div className={`flex h-12 w-12 items-center justify-center rounded-[18px] bg-white/5 ${color}`}>
+                <Icon className="h-5 w-5" />
+              </div>
+
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-text-primary">{title}</p>
+                <p className="mt-1 text-xs leading-5 text-text-muted">{description}</p>
+              </div>
+
+              <ArrowRight className="h-4 w-4 text-text-muted" />
+            </button>
+          ))}
+        </div>
+      </section>
     </PageContainer>
   );
 }
