@@ -362,7 +362,7 @@ async function resolveLawyerForClient(userId: string) {
 
 // ─── Lawyer Dashboard Builder ────────────────────────────────
 async function buildLawyerDashboard(_userId: string, sa: boolean) {
-  const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
+  const profile = await prisma.lawyerProfile.findUnique({ where: { userId: _userId } });
   let _caseCount = 0, _clientCount = 0, _todayCount = 0;
 
   if (profile) {
