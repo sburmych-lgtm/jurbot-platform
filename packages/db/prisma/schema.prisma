@@ -248,6 +248,7 @@ model LawyerProfile {
   appointments Appointment[]
   timeLogs     TimeLog[]
   inviteTokens InviteToken[]
+  availabilities LawyerAvailability[]
 
   @@index([userId])
   @@index([orgId])
@@ -501,4 +502,18 @@ model TelegramIdentity {
 
   @@index([telegramId])
   @@index([userId])
+}
+
+model LawyerAvailability {
+  id        String   @id @default(uuid())
+  lawyerId  String
+  lawyer    LawyerProfile @relation(fields: [lawyerId], references: [id], onDelete: Cascade)
+  date      DateTime
+  slots     String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([lawyerId, date])
+  @@index([lawyerId])
+  @@index([date])
 }

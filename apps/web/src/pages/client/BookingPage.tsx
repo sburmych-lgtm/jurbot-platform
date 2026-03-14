@@ -1,8 +1,7 @@
-import { useState } from 'react';
-import { ChevronLeft, Calendar, Check } from 'lucide-react';
-import { useAuth } from '@/lib/auth';
-import { api } from '@/lib/api';
+import { useEffect, useState } from 'react';
+import { ChevronLeft, Check } from 'lucide-react';
 import { APPOINTMENT_TYPES } from '@jurbot/shared';
+import { api } from '@/lib/api';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { CalendarGrid } from '@/components/calendar/CalendarGrid';
 import { TimeSlots } from '@/components/calendar/TimeSlots';
@@ -10,9 +9,23 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { SummaryRow } from '@/components/ui/SummaryRow';
 import { ProgressSteps } from '@/components/ui/ProgressSteps';
+import { useToast } from '@/components/ui/Toast';
+
+interface AvailabilityPayload {
+  date: string;
+  lawyerId: string;
+  configuredSlots: string[];
+  bookedSlots: string[];
+  availableSlots: string[];
+}
+
+interface CreatedAppointment {
+  refNumber: string;
+}
 
 export function BookingPage() {
-  const { user } = useAuth();
+  const { showToast } = useToast();
+
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
@@ -21,19 +34,79 @@ export function BookingPage() {
   const [loading, setLoading] = useState(false);
   const [refNumber, setRefNumber] = useState('');
 
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [bookingLawyerId, setBookingLawyerId] = useState('');
+
+  useEffect(() => {
+    if (!selectedDate) {
+      setAvailableSlots([]);
+      setBookingLawyerId('');
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      setSlotsLoading(true);
+      try {
+        const res = await api.get<AvailabilityPayload>(
+          `/v1/appointments/availability?date=${encodeURIComponent(selectedDate)}`,
+        );
+        if (cancelled) return;
+
+        setAvailableSlots(res.data?.availableSlots ?? []);
+        setBookingLawyerId(res.data?.lawyerId ?? '');
+      } catch {
+        if (!cancelled) {
+          setAvailableSlots([]);
+          setBookingLawyerId('');
+          showToast('Не вдалося завантажити вільні слоти');
+        }
+      }
+      if (!cancelled) {
+        setSlotsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDate, showToast]);
+
   const handleBook = async () => {
+    if (!selectedDate || !selectedTime || !bookingLawyerId) {
+      showToast('Оберіть дату та час');
+      return;
+    }
+
     setLoading(true);
     try {
       const dateTime = `${selectedDate}T${selectedTime}:00`;
-      const res = await api.post<{ refNumber: string }>('/v1/appointments', {
+      const res = await api.post<CreatedAppointment>('/v1/appointments', {
         date: dateTime,
         type,
+        lawyerId: bookingLawyerId,
         notes: notes || undefined,
       });
+
       setRefNumber(res.data?.refNumber ?? '');
       setStep(4);
-    } catch {}
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Не вдалося створити запис';
+      showToast(message);
+    }
     setLoading(false);
+  };
+
+  const restartBooking = () => {
+    setStep(1);
+    setSelectedDate('');
+    setSelectedTime('');
+    setType('FREE');
+    setNotes('');
+    setRefNumber('');
+    setAvailableSlots([]);
+    setBookingLawyerId('');
   };
 
   if (step === 4) {
@@ -44,17 +117,22 @@ export function BookingPage() {
             <Check size={32} className="text-accent-green" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-text-primary">Записано!</h1>
-            <p className="text-text-muted text-sm mt-1">Ваш номер: <span className="font-mono text-accent-teal">{refNumber}</span></p>
+            <h1 className="text-xl font-bold text-text-primary">Запис підтверджено!</h1>
+            <p className="text-text-muted text-sm mt-1">
+              Ваш номер: <span className="font-mono text-accent-teal">{refNumber}</span>
+            </p>
           </div>
           <Card>
             <div className="space-y-2">
               <SummaryRow label="Дата" value={selectedDate} />
               <SummaryRow label="Час" value={selectedTime} />
-              <SummaryRow label="Тип" value={APPOINTMENT_TYPES.find(t => t.id === type)?.label ?? type} />
+              <SummaryRow
+                label="Тип"
+                value={APPOINTMENT_TYPES.find((item) => item.id === type)?.label ?? type}
+              />
             </div>
           </Card>
-          <Button size="lg" className="w-full" onClick={() => { setStep(1); setSelectedDate(''); setSelectedTime(''); }}>
+          <Button size="lg" className="w-full" onClick={restartBooking}>
             Новий запис
           </Button>
         </div>
@@ -67,7 +145,10 @@ export function BookingPage() {
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           {step > 1 && (
-            <button onClick={() => setStep(step - 1)} className="p-1.5 rounded-[10px] hover:bg-bg-hover">
+            <button
+              onClick={() => setStep((prev) => Math.max(1, prev - 1))}
+              className="p-1.5 rounded-[10px] hover:bg-bg-hover"
+            >
               <ChevronLeft size={20} className="text-text-secondary" />
             </button>
           )}
@@ -77,13 +158,38 @@ export function BookingPage() {
         <ProgressSteps total={3} current={step} />
 
         {step === 1 && (
-          <div className="space-y-4">
-            <CalendarGrid selected={selectedDate} onSelect={d => { setSelectedDate(d); setStep(2); }} />
-          </div>
+          <CalendarGrid
+            selected={selectedDate}
+            onSelect={(date) => {
+              setSelectedDate(date);
+              setSelectedTime('');
+              setStep(2);
+            }}
+          />
         )}
 
         {step === 2 && (
-          <TimeSlots date={selectedDate} selected={selectedTime} onSelect={t => { setSelectedTime(t); setStep(3); }} />
+          <div className="space-y-4">
+            {slotsLoading ? (
+              <Card>Завантажуємо вільні години...</Card>
+            ) : availableSlots.length === 0 ? (
+              <Card>
+                <p className="text-sm text-text-secondary">
+                  На обрану дату немає доступних годин. Оберіть інший день.
+                </p>
+              </Card>
+            ) : (
+              <TimeSlots
+                date={selectedDate}
+                selected={selectedTime}
+                availableSlots={availableSlots}
+                onSelect={(time) => {
+                  setSelectedTime(time);
+                  setStep(3);
+                }}
+              />
+            )}
+          </div>
         )}
 
         {step === 3 && (
@@ -93,36 +199,43 @@ export function BookingPage() {
                 <SummaryRow label="Дата" value={selectedDate} />
                 <SummaryRow label="Час" value={selectedTime} />
               </div>
+
               <div className="space-y-3">
                 <div>
-                  <label className="text-sm font-medium text-text-secondary mb-2 block">Тип зустрічі</label>
+                  <label className="text-sm font-medium text-text-secondary mb-2 block">
+                    Тип зустрічі
+                  </label>
                   <div className="flex flex-wrap gap-2">
-                    {APPOINTMENT_TYPES.map(t => (
+                    {APPOINTMENT_TYPES.map((appointmentType) => (
                       <button
-                        key={t.id}
-                        onClick={() => setType(t.id)}
+                        key={appointmentType.id}
+                        onClick={() => setType(appointmentType.id)}
                         className={`px-3 py-2 rounded-[10px] text-sm font-medium transition ${
-                          type === t.id
+                          type === appointmentType.id
                             ? 'bg-accent-teal text-bg-primary'
                             : 'bg-bg-tertiary border border-border-default text-text-secondary'
                         }`}
                       >
-                        {t.label}
+                        {appointmentType.label}
                       </button>
                     ))}
                   </div>
                 </div>
+
                 <div>
-                  <label className="text-sm font-medium text-text-secondary mb-1 block">Нотатки</label>
+                  <label className="text-sm font-medium text-text-secondary mb-1 block">
+                    Нотатки
+                  </label>
                   <textarea
                     value={notes}
-                    onChange={e => setNotes(e.target.id)}
+                    onChange={(event) => setNotes(event.target.value)}
                     placeholder="Опишіть ваше питання..."
                     className="w-full px-4 py-3 rounded-[14px] border border-border-default bg-bg-tertiary text-text-primary placeholder-text-muted focus:border-accent-teal focus:outline-none text-sm resize-none min-h-[80px]"
                   />
                 </div>
               </div>
             </Card>
+
             <Button size="lg" className="w-full" loading={loading} onClick={handleBook}>
               Підтвердити запис
             </Button>

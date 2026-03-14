@@ -46,6 +46,7 @@ const SPECIALIZATION_MAP: Record<string, string> = {
   CIVIL: '⚖️ Цивільне',
   COMMERCIAL: '🏢 Господарське',
   CRIMINAL: '🔒 Кримінальне',
+  MILITARY: '🪖 Військове право',
   MIGRATION: '✈️ Міграційне',
   REALESTATE: '🏠 Нерухомість',
   LABOR: '👷 Трудове',
@@ -169,11 +170,11 @@ async function notifyLawyerAboutClient(
 
     const safeName = escapeHtml(clientName);
     const safePhone = escapeHtml(clientPhone || '—');
-    const text =
-      '🔔 <b>Новий клієнт зареєструвався!</b>\n\n' +
-      `👤 Ім'я: ${safeName}\n` +
-      `📱 Телефон: ${safePhone}\n\n` +
-      '📱 Відкрийте Mini App для деталей.';
+  const text =
+    '🔔 <b>Новий клієнт зареєструвався!</b>\n\n' +
+    `👤 Ім'я: ${safeName}\n` +
+    `📱 Телефон: ${safePhone}\n\n` +
+    '📱 Відкрийте Mini App для деталей 👇';
 
     const telegramSent = await sendTelegramHtmlMessage(lawyerBotToken, lawyerIdentity.chatId, text);
 
@@ -286,6 +287,8 @@ function buildClientActionKeyboard(): InlineKeyboard {
 }
 
 function buildClientInviteLink(token: string): string {
+  void buildLawyerActionKeyboard;
+  void buildClientActionKeyboard;
   return `https://t.me/${CLIENT_BOT_USERNAME}?start=${token}`;
 }
 
@@ -358,9 +361,9 @@ async function resolveLawyerForClient(userId: string) {
 }
 
 // ─── Lawyer Dashboard Builder ────────────────────────────────
-async function buildLawyerDashboard(userId: string, sa: boolean) {
+async function buildLawyerDashboard(_userId: string, sa: boolean) {
   const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
-  let caseCount = 0, clientCount = 0, todayCount = 0;
+  let _caseCount = 0, _clientCount = 0, _todayCount = 0;
 
   if (profile) {
     const today = new Date();
@@ -368,22 +371,23 @@ async function buildLawyerDashboard(userId: string, sa: boolean) {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    [caseCount, clientCount, todayCount] = await Promise.all([
+    [_caseCount, _clientCount, _todayCount] = await Promise.all([
       prisma.case.count({ where: { lawyerId: profile.id } }),
       prisma.clientProfile.count({ where: { orgId: profile.orgId! } }),
       prisma.appointment.count({ where: { lawyerId: profile.id, date: { gte: today, lt: tomorrow } } }),
     ]);
   }
 
-  const keyboard = buildLawyerActionKeyboard(sa);
+  void _caseCount;
+  void _clientCount;
+  void _todayCount;
+  const keyboard = undefined;
 
   const badge = sa ? ' 👑' : '';
   const text =
     `<b>⚖️ ЮрБот PRO</b>${badge}\n` +
     `━━━━━━━━━━━━━━━━━\n` +
-    `Ваш операційний кабінет адвоката\n\n` +
-    `📊 Справ: ${caseCount} | 👥 Клієнтів: ${clientCount}\n` +
-    `📅 Сьогодні: ${todayCount} | 📝 Заявок: 0`;
+    `Ваш операційний кабінет адвоката 👇`;
 
   return { text, keyboard };
 }
@@ -429,7 +433,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
       await ctx.reply(text, { parse_mode: 'HTML', reply_markup: keyboard });
 
       if (miniAppUrl) {
-        await ctx.reply('📱 Відкрийте Mini App для повного доступу:', {
+      await ctx.reply('📱 Відкрити ЮрБот можна тут 👇', {
           reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот', 'lawyer'),
         });
 
@@ -517,7 +521,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
       const telegramId = BigInt(ctx.from!.id);
       const name = ctx.session.name!;
       const sa = isSuperadmin(telegramId, superadminTelegramId);
-      const specialties = (ctx.session.specialties ?? []) as Array<'FAMILY' | 'CIVIL' | 'COMMERCIAL' | 'CRIMINAL' | 'MIGRATION' | 'REALESTATE' | 'LABOR' | 'OTHER'>;
+      const specialties = (ctx.session.specialties ?? []) as Array<'FAMILY' | 'CIVIL' | 'COMMERCIAL' | 'CRIMINAL' | 'MILITARY' | 'MIGRATION' | 'REALESTATE' | 'LABOR' | 'OTHER'>;
 
       try {
         const result = await prisma.$transaction(async (tx) => {
@@ -597,7 +601,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
 
         // Open Mini App
         if (miniAppUrl) {
-          await ctx.reply('📱 Ваш кабінет готовий! Відкрийте Mini App:', {
+        await ctx.reply('📱 Ваш кабінет готовий. Відкрити ЮрБот можна тут 👇', {
             reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот', 'lawyer'),
           });
 
@@ -993,11 +997,11 @@ export function createLawyerBot(opts: BotOptions): Bot {
   bot.callbackQuery('l:docs', async (ctx) => {
     await ctx.answerCallbackQuery();
     if (miniAppUrl) {
-      await ctx.reply('📄 AI Документи доступні через Mini App:', {
+      await ctx.reply('📄 Генерація документа доступна через Mini App:', {
         reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Генерація документів', 'lawyer'),
       });
     } else {
-      await ctx.reply('📄 AI Документи\n\nГенерація документів доступна через Mini App.');
+      await ctx.reply('📄 Генерація документа\n\nГенерація документів доступна через Mini App.');
     }
   });
 
@@ -1100,14 +1104,15 @@ export function createClientBot(opts: BotOptions): Bot {
     if (existing) {
       // Already registered — show client menu + Mini App
       await ctx.reply(
-        `<b>👋 Ласкаво просимо до ЮрБот!</b>\n` +
+      `<b>👋 Ласкаво просимо до ЮрБот!</b>\n` +
         `━━━━━━━━━━━━━━━━━\n` +
-        `Ваш цифровий юридичний асистент`,
-        { parse_mode: 'HTML', reply_markup: buildClientActionKeyboard() },
+        `Ваш цифровий юридичний асистент\n\n` +
+        `📅 Запис доступний через miniapp 👇`,
+      { parse_mode: 'HTML' },
       );
 
       if (miniAppUrl) {
-        await ctx.reply('📱 Відкрийте Mini App для повного доступу:', {
+      await ctx.reply('📱 Відкрити ЮрБот можна тут 👇', {
           reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот', 'client'),
         });
 
@@ -1388,15 +1393,16 @@ export function createClientBot(opts: BotOptions): Bot {
 
         // Show client menu
         await ctx.reply(
-          `<b>👋 Ласкаво просимо до ЮрБот!</b>\n` +
+        `<b>👋 Ласкаво просимо до ЮрБот!</b>\n` +
           `━━━━━━━━━━━━━━━━━\n` +
-          `Ваш цифровий юридичний асистент`,
-          { parse_mode: 'HTML', reply_markup: buildClientActionKeyboard() },
+          `Ваш цифровий юридичний асистент\n\n` +
+          `📅 Запис доступний через miniapp 👇`,
+        { parse_mode: 'HTML' },
         );
 
         // Open Mini App
         if (miniAppUrl) {
-          await ctx.reply('📱 Відкрийте Mini App для повного доступу:', {
+        await ctx.reply('📱 Відкрити ЮрБот можна тут 👇', {
             reply_markup: buildMiniAppKeyboard(miniAppUrl, 'Відкрити ЮрБот', 'client'),
           });
 

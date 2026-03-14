@@ -1,4 +1,4 @@
-import { isTelegramWebApp, getInitData } from './telegram';
+import { getInitData, isTelegramWebApp } from './telegram';
 
 const API_BASE = '/api';
 
@@ -6,7 +6,11 @@ export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
-  meta?: { cursor?: string; hasMore?: boolean; total?: number };
+  meta?: {
+    cursor?: string;
+    hasMore?: boolean;
+    total?: number;
+  };
 }
 
 class ApiClient {
@@ -26,19 +30,23 @@ class ApiClient {
     if (isTelegramWebApp()) {
       headers['X-Telegram-Init-Data'] = getInitData();
     }
+
     // JWT fallback (for dev/testing)
     if (this.accessToken) {
-      headers['Authorization'] = `Bearer ${this.accessToken}`;
+      headers.Authorization = `Bearer ${this.accessToken}`;
     }
 
-    const res = await fetch(`${API_BASE}${path}`, {
+    const response = await fetch(`${API_BASE}${path}`, {
       ...options,
       headers,
       credentials: 'include',
     });
-    const json = (await res.json()) as ApiResponse<T>;
 
-    if (!res.ok) throw new Error(json.error ?? 'Помилка сервера');
+    const json = (await response.json()) as ApiResponse<T>;
+    if (!response.ok) {
+      throw new Error(json.error ?? 'Помилка сервера');
+    }
+
     return json;
   }
 
@@ -47,11 +55,24 @@ class ApiClient {
   }
 
   post<T>(path: string, data: unknown) {
-    return this.request<T>(path, { method: 'POST', body: JSON.stringify(data) });
+    return this.request<T>(path, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  put<T>(path: string, data: unknown) {
+    return this.request<T>(path, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   }
 
   patch<T>(path: string, data: unknown) {
-    return this.request<T>(path, { method: 'PATCH', body: JSON.stringify(data) });
+    return this.request<T>(path, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
   }
 
   delete<T>(path: string) {

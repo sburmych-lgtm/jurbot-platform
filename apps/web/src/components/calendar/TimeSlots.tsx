@@ -1,35 +1,55 @@
 import { formatDateUk } from '@jurbot/shared';
 
-const MORNING = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30'];
-const AFTERNOON = ['13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'];
+const SLOT_GROUPS = [
+  { label: 'Ранок', slots: ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30'] },
+  {
+    label: 'День',
+    slots: ['13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'],
+  },
+] as const;
 
 interface TimeSlotsProps {
   date: string;
   selected: string;
   onSelect: (time: string) => void;
   busySlots?: string[];
+  availableSlots?: string[];
 }
 
-export function TimeSlots({ date, selected, onSelect, busySlots = [] }: TimeSlotsProps) {
-  const renderSlots = (slots: string[], label: string) => (
+export function TimeSlots({
+  date,
+  selected,
+  onSelect,
+  busySlots = [],
+  availableSlots,
+}: TimeSlotsProps) {
+  const availableSet = new Set(availableSlots ?? []);
+  const busySet = new Set(busySlots);
+
+  const renderSlots = (slots: readonly string[], label: string) => (
     <div>
       <p className="text-sm font-medium text-text-secondary mb-2">{label}</p>
       <div className="grid grid-cols-3 gap-2">
-        {slots.map(t => {
-          const busy = busySlots.includes(t);
-          const sel = selected === t;
+        {slots.map((slot) => {
+          const unavailableByConfig =
+            availableSlots !== undefined && !availableSet.has(slot);
+          const busy = busySet.has(slot) || unavailableByConfig;
+          const active = selected === slot;
+
           return (
             <button
-              key={t}
+              key={slot}
               disabled={busy}
-              onClick={() => onSelect(t)}
+              onClick={() => onSelect(slot)}
               className={`py-3 rounded-[14px] text-sm font-medium transition ${
-                sel ? 'bg-accent-teal text-bg-primary font-bold'
-                : busy ? 'bg-bg-tertiary text-text-muted/40 line-through cursor-not-allowed'
-                : 'bg-bg-card border border-border-default text-text-secondary hover:border-accent-teal'
+                active
+                  ? 'bg-accent-teal text-bg-primary font-bold'
+                  : busy
+                    ? 'bg-bg-tertiary text-text-muted/40 line-through cursor-not-allowed'
+                    : 'bg-bg-card border border-border-default text-text-secondary hover:border-accent-teal'
               }`}
             >
-              {t}
+              {slot}
             </button>
           );
         })}
@@ -43,8 +63,9 @@ export function TimeSlots({ date, selected, onSelect, busySlots = [] }: TimeSlot
         <h2 className="text-xl font-bold text-text-primary">Оберіть час</h2>
         <span className="text-sm text-text-muted">{formatDateUk(date)}</span>
       </div>
-      {renderSlots(MORNING, 'Ранок')}
-      {renderSlots(AFTERNOON, 'День')}
+      {SLOT_GROUPS.map((group) => (
+        <div key={group.label}>{renderSlots(group.slots, group.label)}</div>
+      ))}
     </div>
   );
 }
