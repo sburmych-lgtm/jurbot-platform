@@ -3,11 +3,16 @@ import { AppError } from '../middleware/errorHandler.js';
 import type { PaginationParams } from '../utils/pagination.js';
 import type { UpdateUserInput } from '@jurbot/shared';
 
-export async function list(params: PaginationParams & { role?: string }) {
-  const { cursor, limit = 20, role } = params;
-  const where = {
+export async function list(params: PaginationParams & { role?: string; orgId?: string }) {
+  const { cursor, limit = 20, role, orgId } = params;
+
+  // SECURITY: when listing CLIENTs, always scope to the lawyer's org
+  const where: Record<string, unknown> = {
     deletedAt: null,
     ...(role ? { role: role as 'LAWYER' | 'CLIENT' } : {}),
+    ...(orgId && role === 'CLIENT'
+      ? { clientProfile: { orgId } }
+      : {}),
   };
 
   const items = await prisma.user.findMany({

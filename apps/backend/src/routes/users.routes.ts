@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { prisma } from '@jurbot/db';
 import { updateUserSchema } from '@jurbot/shared';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
@@ -10,12 +11,23 @@ import * as userService from '../services/user.service.js';
 
 export const usersRouter = Router();
 
-// GET /users — LAWYER only, paginated list
+// GET /users — LAWYER only, scoped to lawyer's organization
 usersRouter.get('/', authenticate, requireRole('LAWYER'), async (req, res, next) => {
   try {
     const pagination = parsePagination(req.query as Record<string, unknown>);
     const role = typeof req.query.role === 'string' ? req.query.role : undefined;
-    const result = await userService.list({ ...pagination, role });
+
+    // SECURITY: resolve lawyer's orgId to scope client list
+    let orgId: string | undefined;
+    if (role === 'CLIENT') {
+      const lawyerProfile = await prisma.lawyerProfile.findUnique({
+        where: { userId: req.user!.id },
+        select: { orgId: true },
+      });
+      orgId = lawyerProfile?.orgId ?? undefined;
+    }
+
+    const result = await userService.list({ ...pagination, role, orgId });
     res.json({ success: true, data: result.items, meta: result.meta });
   } catch (error) {
     next(error);
