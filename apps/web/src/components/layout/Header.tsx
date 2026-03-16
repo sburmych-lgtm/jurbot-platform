@@ -54,8 +54,8 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 pt-3">
-      <div className="glass-panel rounded-[24px] px-4 py-4">
+    <header className="sticky top-0 z-40 pt-2">
+      <div className="glass-panel rounded-[24px] px-4 py-3">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className={`flex h-11 w-11 items-center justify-center rounded-[14px] shadow-[0_18px_36px_rgba(0,0,0,0.24)] ${accentClass}`}>
@@ -68,8 +68,8 @@ export function Header() {
                   {roleLabel}
                 </span>
               </div>
-              <h1 className="font-display text-[1.7rem] leading-none text-text-primary">{title}</h1>
-              <p className="mt-1 text-sm text-text-secondary">
+              <h1 className="font-display text-[1.4rem] leading-none text-text-primary sm:text-[1.7rem]">{title}</h1>
+              <p className="mt-0.5 text-sm text-text-secondary sm:mt-1">
                 {user ? user.name : 'Єдиний цифровий контур для юриста та клієнта'}
               </p>
             </div>

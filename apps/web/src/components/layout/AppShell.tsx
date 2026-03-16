@@ -18,9 +18,9 @@ export function AppShell() {
       </div>
 
       <div className="relative min-h-screen">
-        <div className="mx-auto max-w-lg px-4 pb-28">
+        <div className="mx-auto max-w-lg px-3 pb-24 sm:px-4 sm:pb-28">
           <Header />
-          <main className="pt-4">
+          <main className="pt-3 sm:pt-4">
             <Outlet />
           </main>
         </div>
