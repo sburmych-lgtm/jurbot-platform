@@ -7,7 +7,7 @@ import { BottomNav } from './BottomNav';
 export function AppShell() {
   const { user } = useAuth();
   const botSource = getBotSource();
-  const role = botSource === 'lawyer' || user?.role === 'LAWYER' ? 'lawyer' : 'client';
+  const role = botSource === 'client' ? 'client' : (botSource === 'lawyer' || user?.role === 'LAWYER') ? 'lawyer' : 'client';
 
   return (
     <div className={`miniapp-shell miniapp-shell--${role}`}>

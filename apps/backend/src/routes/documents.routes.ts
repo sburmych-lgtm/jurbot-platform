@@ -74,6 +74,19 @@ documentsRouter.patch('/:id', authenticate, requireRole('LAWYER'), validate(upda
   }
 });
 
+// POST /documents/upload — CLIENT uploads a file to their active case
+documentsRouter.post('/upload', authenticate, async (req, res, next) => {
+  try {
+    const name = (req.body?.name as string) || 'document';
+    // For now, store a reference; actual file bytes could be handled via multer later
+    const content = `upload:web:${name}:${Date.now()}`;
+    const doc = await documentService.clientUpload(name, content, req.user!.id);
+    res.status(201).json({ success: true, data: doc });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // DELETE /documents/:id — LAWYER only (own, soft delete)
 documentsRouter.delete('/:id', authenticate, requireRole('LAWYER'), async (req, res, next) => {
   try {

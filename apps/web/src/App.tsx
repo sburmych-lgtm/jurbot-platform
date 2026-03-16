@@ -73,10 +73,11 @@ function HomeRedirect() {
     return <Navigate to="/login" replace />;
   }
 
-  // Route based on user role (DB source of truth)
-  // Bot source can override for superadmins who have both roles
+  // Bot source (from Telegram ?startapp= param) overrides DB role.
+  // This lets a LAWYER access client UI via @YurBotClientBot.
   const botSource = getBotSource();
-  if (user.role === 'LAWYER' || botSource === 'lawyer') return <Navigate to="/lawyer" replace />;
+  if (botSource === 'client') return <Navigate to="/client" replace />;
+  if (botSource === 'lawyer' || user.role === 'LAWYER') return <Navigate to="/lawyer" replace />;
   return <Navigate to="/client" replace />;
 }
 

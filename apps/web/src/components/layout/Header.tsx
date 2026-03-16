@@ -37,7 +37,7 @@ export function Header() {
   const location = useLocation();
   const botSource = getBotSource();
 
-  const role = botSource === 'lawyer' || user?.role === 'LAWYER' ? 'LAWYER' : 'CLIENT';
+  const role = botSource === 'client' ? 'CLIENT' : (botSource === 'lawyer' || user?.role === 'LAWYER') ? 'LAWYER' : 'CLIENT';
   const basePath = role === 'LAWYER' ? '/lawyer' : '/client';
   const title = resolveTitle(location.pathname, role);
   const roleLabel = role === 'LAWYER' ? 'PRO' : 'CLIENT';

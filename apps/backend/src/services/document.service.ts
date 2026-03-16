@@ -219,6 +219,38 @@ ${fieldsSummary}
   return text;
 }
 
+/** Upload a document from CLIENT to their active case */
+export async function clientUpload(fileName: string, fileContent: string, userId: string) {
+  const profile = await prisma.clientProfile.findUnique({ where: { userId } });
+  if (!profile) {
+    throw new AppError(403, 'Профіль клієнта не знайдено');
+  }
+
+  const activeCase = await prisma.case.findFirst({
+    where: { clientId: profile.id, status: { not: 'COMPLETED' }, deletedAt: null },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (!activeCase) {
+    throw new AppError(400, 'У вас немає активної справи для завантаження файлу');
+  }
+
+  return prisma.document.create({
+    data: {
+      name: fileName,
+      type: 'upload',
+      content: fileContent,
+      size: String(Buffer.byteLength(fileContent, 'utf-8')),
+      status: 'DRAFT',
+      caseId: activeCase.id,
+      orgId: profile.orgId,
+    },
+    include: {
+      case: { select: { id: true, caseNumber: true, title: true } },
+    },
+  });
+}
+
 /** Verify that a CLIENT user has access to a specific document */
 export async function verifyClientAccess(docId: string, userId: string): Promise<void> {
   const profile = await prisma.clientProfile.findUnique({ where: { userId } });
