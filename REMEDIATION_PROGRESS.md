@@ -44,10 +44,17 @@
 - Git: 5 commits pushed to `codex-sync` branch
 - Deploy: Railway production triggered (service: jurbot-platform)
 
+## Phase 8: Bug 12 — Telegram Upload Handler
+- Status: ✅ Complete
+- Files modified:
+  - `packages/telegram/src/config.ts` — added `message:document` and `message:photo` handlers in client bot
+- Behavior: saves file as Document record linked to client's active case, notifies lawyer via Telegram
+- Validation: build ✅ | typecheck ✅ | test ✅ (29/29)
+
 ## Summary
-- **13 bugs fixed** (IDOR/authorization across all API endpoints)
+- **All 13 bugs fixed** (IDOR/authorization + Telegram upload)
 - **19 regression tests** added
 - **UI polish** applied (mobile spacing)
 - **ESLint v9** configured
-- **Bug 12** (Telegram upload silent failure) — deferred, requires Telegram bot token setup
 - All validation gates pass: build, typecheck, 29/29 tests, 0 lint errors
+- Deployed to Railway production from `main` branch
