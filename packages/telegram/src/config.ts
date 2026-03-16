@@ -1641,6 +1641,81 @@ export function createClientBot(opts: BotOptions): Bot {
     );
   });
 
+  // ── Document & photo upload handler (Bug 12 fix) ──
+  bot.on(['message:document', 'message:photo'], async (ctx) => {
+    const telegramId = BigInt(ctx.from!.id);
+    const identity = await prisma.telegramIdentity.findFirst({
+      where: { telegramId, botType: 'client' },
+      include: { user: { include: { clientProfile: true } } },
+    });
+
+    if (!identity?.user?.clientProfile) {
+      await ctx.reply('Спочатку завершіть реєстрацію через кнопку "Почати".');
+      return;
+    }
+
+    const clientProfile = identity.user.clientProfile;
+    const activeCase = await prisma.case.findFirst({
+      where: { clientId: clientProfile.id, status: { not: 'COMPLETED' } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!activeCase) {
+      await ctx.reply('У вас немає активної справи, до якої можна прикріпити файл.');
+      return;
+    }
+
+    const doc = ctx.message.document;
+    const photo = ctx.message.photo;
+    const fileName = doc?.file_name ?? `photo_${Date.now()}.jpg`;
+    const fileSize = doc?.file_size ?? photo?.[photo.length - 1]?.file_size ?? 0;
+    const mimeType = doc?.mime_type ?? 'image/jpeg';
+    const fileId = doc?.file_id ?? photo?.[photo.length - 1]?.file_id;
+
+    if (!fileId) {
+      await ctx.reply('❌ Не вдалося отримати файл. Спробуйте ще раз.');
+      return;
+    }
+
+    try {
+      // Store as Document record linked to the case
+      await prisma.document.create({
+        data: {
+          name: fileName,
+          type: mimeType,
+          size: String(fileSize),
+          content: `telegram:${fileId}`,
+          status: 'DRAFT',
+          caseId: activeCase.id,
+          orgId: clientProfile.orgId,
+        },
+      });
+
+      // Notify the lawyer
+      const lawyer = await resolveLawyerForClient(identity.userId);
+      if (lawyer && lawyerBotToken) {
+        const lawyerIdentity = await prisma.telegramIdentity.findFirst({
+          where: { userId: lawyer.userId, botType: 'lawyer' },
+        });
+        if (lawyerIdentity) {
+          const safeName = escapeHtml(identity.user.name);
+          const safeFile = escapeHtml(fileName);
+          const notifyBot = new Bot(lawyerBotToken);
+          await notifyBot.api.sendMessage(
+            lawyerIdentity.telegramId.toString(),
+            `📎 <b>Клієнт ${safeName}</b> завантажив файл:\n<i>${safeFile}</i>\n\nСправа: ${escapeHtml(activeCase.title)}`,
+            { parse_mode: 'HTML' },
+          );
+        }
+      }
+
+      await ctx.reply(`✅ Файл "${fileName}" прикріплено до справи "${activeCase.title}".`);
+    } catch (err) {
+      console.error('[Client Bot] Upload error:', err);
+      await ctx.reply('❌ Помилка при збереженні файлу. Спробуйте пізніше.');
+    }
+  });
+
   bot.catch((err) => {
     console.error('[Client Bot Error]', err);
   });
