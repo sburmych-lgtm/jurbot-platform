@@ -38,7 +38,7 @@ timelogsRouter.post('/', authenticate, requireRole('LAWYER'), validate(createTim
 // PATCH /timelogs/:id — LAWYER only
 timelogsRouter.patch('/:id', authenticate, requireRole('LAWYER'), validate(updateTimeLogSchema), async (req, res, next) => {
   try {
-    const entry = await timelogService.update(param(req, 'id'), req.body);
+    const entry = await timelogService.update(param(req, 'id'), req.body, req.user!.id);
     res.json({ success: true, data: entry });
   } catch (error) {
     next(error);
@@ -48,7 +48,7 @@ timelogsRouter.patch('/:id', authenticate, requireRole('LAWYER'), validate(updat
 // DELETE /timelogs/:id — LAWYER only
 timelogsRouter.delete('/:id', authenticate, requireRole('LAWYER'), async (req, res, next) => {
   try {
-    await timelogService.remove(param(req, 'id'));
+    await timelogService.remove(param(req, 'id'), req.user!.id);
     res.json({ success: true, data: { message: 'Запис часу видалено' } });
   } catch (error) {
     next(error);

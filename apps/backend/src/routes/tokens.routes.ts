@@ -74,10 +74,18 @@ tokensRouter.get('/resolve/:token', async (req, res, next) => {
   }
 });
 
-// DELETE /tokens/:id — LAWYER only (deactivate token)
+// DELETE /tokens/:id — LAWYER only (deactivate own token)
 tokensRouter.delete('/:id', flexAuth, requireRole('LAWYER'), async (req, res, next) => {
   try {
-    await tokenService.deactivateToken(param(req, 'id'));
+    const { prisma } = await import('@jurbot/db');
+    const lawyerProfile = await prisma.lawyerProfile.findUnique({
+      where: { userId: req.user!.id },
+    });
+    if (!lawyerProfile) {
+      res.status(404).json({ success: false, error: 'Профіль адвоката не знайдено' });
+      return;
+    }
+    await tokenService.deactivateToken(param(req, 'id'), lawyerProfile.id);
     res.json({ success: true, data: { deactivated: true } });
   } catch (error) {
     next(error);

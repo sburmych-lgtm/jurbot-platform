@@ -11,11 +11,18 @@ export async function list(params: PaginationParams & { userId?: string; role?: 
 
   const where: Record<string, unknown> = { deletedAt: null };
   if (role === 'CLIENT' && userId) {
-    // CLIENT sees only documents from their own cases
     const profile = await prisma.clientProfile.findUnique({ where: { userId } });
     if (!profile) return { items: [], meta: { hasMore: false } };
     const caseIds = await prisma.case.findMany({
       where: { clientId: profile.id, deletedAt: null },
+      select: { id: true },
+    });
+    where.caseId = { in: caseIds.map((c) => c.id) };
+  } else if (role === 'LAWYER' && userId) {
+    const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
+    if (!profile) return { items: [], meta: { hasMore: false } };
+    const caseIds = await prisma.case.findMany({
+      where: { lawyerId: profile.id, deletedAt: null },
       select: { id: true },
     });
     where.caseId = { in: caseIds.map((c) => c.id) };
@@ -36,11 +43,11 @@ export async function list(params: PaginationParams & { userId?: string; role?: 
   return { items, meta: { cursor: items.at(-1)?.id, hasMore } };
 }
 
-export async function getById(id: string) {
+export async function getById(id: string, userId?: string, userRole?: string) {
   const doc = await prisma.document.findUnique({
     where: { id },
     include: {
-      case: { select: { id: true, caseNumber: true, title: true, clientId: true } },
+      case: { select: { id: true, caseNumber: true, title: true, clientId: true, lawyerId: true } },
       upload: true,
     },
   });
@@ -48,15 +55,33 @@ export async function getById(id: string) {
   if (!doc || doc.deletedAt) {
     throw new AppError(404, 'Документ не знайдено');
   }
+
+  if (userRole === 'LAWYER' && userId) {
+    const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
+    if (!profile || doc.case.lawyerId !== profile.id) {
+      throw new AppError(403, 'Ви не маєте доступу до цього документа');
+    }
+  }
+
   return doc;
 }
 
-export async function create(input: CreateDocumentInput) {
-  // Verify case exists
-  const caseRecord = await prisma.case.findUnique({ where: { id: input.caseId } });
+async function verifyCaseOwnership(caseId: string, userId: string) {
+  const caseRecord = await prisma.case.findUnique({ where: { id: caseId } });
   if (!caseRecord || caseRecord.deletedAt) {
     throw new AppError(404, 'Справу не знайдено');
   }
+
+  const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
+  if (!profile || caseRecord.lawyerId !== profile.id) {
+    throw new AppError(403, 'Ви не маєте доступу до цієї справи');
+  }
+
+  return caseRecord;
+}
+
+export async function create(input: CreateDocumentInput, userId: string) {
+  await verifyCaseOwnership(input.caseId, userId);
 
   return prisma.document.create({
     data: {
@@ -71,10 +96,18 @@ export async function create(input: CreateDocumentInput) {
   });
 }
 
-export async function update(id: string, input: UpdateDocumentInput) {
-  const existing = await prisma.document.findUnique({ where: { id } });
+export async function update(id: string, input: UpdateDocumentInput, userId: string) {
+  const existing = await prisma.document.findUnique({
+    where: { id },
+    include: { case: { select: { lawyerId: true } } },
+  });
   if (!existing || existing.deletedAt) {
     throw new AppError(404, 'Документ не знайдено');
+  }
+
+  const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
+  if (!profile || existing.case.lawyerId !== profile.id) {
+    throw new AppError(403, 'Ви не маєте доступу до цього документа');
   }
 
   return prisma.document.update({
@@ -86,10 +119,18 @@ export async function update(id: string, input: UpdateDocumentInput) {
   });
 }
 
-export async function softDelete(id: string) {
-  const existing = await prisma.document.findUnique({ where: { id } });
+export async function softDelete(id: string, userId: string) {
+  const existing = await prisma.document.findUnique({
+    where: { id },
+    include: { case: { select: { lawyerId: true } } },
+  });
   if (!existing || existing.deletedAt) {
     throw new AppError(404, 'Документ не знайдено');
+  }
+
+  const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
+  if (!profile || existing.case.lawyerId !== profile.id) {
+    throw new AppError(403, 'Ви не маєте доступу до цього документа');
   }
 
   await prisma.document.update({
@@ -98,23 +139,18 @@ export async function softDelete(id: string) {
   });
 }
 
-export async function generate(input: GenerateDocumentInput) {
+export async function generate(input: GenerateDocumentInput, userId: string) {
   const template = TEMPLATES.find((t) => t.id === input.templateId);
   if (!template) {
     throw new AppError(404, 'Шаблон не знайдено');
   }
 
-  // Verify case if provided
   if (input.caseId) {
-    const caseRecord = await prisma.case.findUnique({ where: { id: input.caseId } });
-    if (!caseRecord || caseRecord.deletedAt) {
-      throw new AppError(404, 'Справу не знайдено');
-    }
+    await verifyCaseOwnership(input.caseId, userId);
   }
 
   const content = await generateWithGemini(template.name, template.id, input.data);
 
-  // Save to DB only if caseId is provided; otherwise return content without persisting
   if (input.caseId) {
     return prisma.document.create({
       data: {
@@ -129,7 +165,15 @@ export async function generate(input: GenerateDocumentInput) {
     });
   }
 
-  return { id: crypto.randomUUID(), name: `${template.name}.pdf`, type: template.id, content, status: 'DRAFT', createdAt: new Date().toISOString() };
+  return {
+    id: crypto.randomUUID(),
+    name: `${template.name}.pdf`,
+    type: template.id,
+    content,
+    status: 'DRAFT',
+    persisted: false,
+    createdAt: new Date().toISOString(),
+  };
 }
 
 async function generateWithGemini(

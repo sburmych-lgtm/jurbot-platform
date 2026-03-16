@@ -63,7 +63,14 @@ export async function incrementTokenUsage(tokenId: string) {
   });
 }
 
-export async function deactivateToken(tokenId: string) {
+export async function deactivateToken(tokenId: string, lawyerId: string) {
+  const token = await prisma.inviteToken.findFirst({
+    where: { id: tokenId, lawyerId },
+  });
+  if (!token) {
+    throw new Error('Токен не знайдено або не належить вам');
+  }
+
   return prisma.inviteToken.update({
     where: { id: tokenId },
     data: { isActive: false },

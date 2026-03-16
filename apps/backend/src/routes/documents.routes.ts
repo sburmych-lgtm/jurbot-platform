@@ -15,7 +15,7 @@ documentsRouter.get('/templates', authenticate, requireRole('LAWYER'), (_req, re
   res.json({ success: true, data: TEMPLATES });
 });
 
-// GET /documents — LAWYER (all), CLIENT (own case docs)
+// GET /documents — LAWYER (own case docs), CLIENT (own case docs)
 documentsRouter.get('/', authenticate, async (req, res, next) => {
   try {
     const pagination = parsePagination(req.query as Record<string, unknown>);
@@ -30,54 +30,54 @@ documentsRouter.get('/', authenticate, async (req, res, next) => {
   }
 });
 
-// POST /documents — LAWYER only
+// POST /documents — LAWYER only (own case)
 documentsRouter.post('/', authenticate, requireRole('LAWYER'), validate(createDocumentSchema), async (req, res, next) => {
   try {
-    const doc = await documentService.create(req.body);
+    const doc = await documentService.create(req.body, req.user!.id);
     res.status(201).json({ success: true, data: doc });
   } catch (error) {
     next(error);
   }
 });
 
-// POST /documents/generate — LAWYER only (from template)
+// POST /documents/generate — LAWYER only (own case, from template)
 documentsRouter.post('/generate', authenticate, requireRole('LAWYER'), validate(generateDocumentSchema), async (req, res, next) => {
   try {
-    const doc = await documentService.generate(req.body);
+    const doc = await documentService.generate(req.body, req.user!.id);
     res.status(201).json({ success: true, data: doc });
   } catch (error) {
     next(error);
   }
 });
 
-// GET /documents/:id — LAWYER or assigned CLIENT
+// GET /documents/:id — LAWYER (own) or assigned CLIENT
 documentsRouter.get('/:id', authenticate, async (req, res, next) => {
   try {
     const id = param(req, 'id');
     if (req.user!.role === 'CLIENT') {
       await documentService.verifyClientAccess(id, req.user!.id);
     }
-    const doc = await documentService.getById(id);
+    const doc = await documentService.getById(id, req.user!.id, req.user!.role);
     res.json({ success: true, data: doc });
   } catch (error) {
     next(error);
   }
 });
 
-// PATCH /documents/:id — LAWYER only
+// PATCH /documents/:id — LAWYER only (own)
 documentsRouter.patch('/:id', authenticate, requireRole('LAWYER'), validate(updateDocumentSchema), async (req, res, next) => {
   try {
-    const doc = await documentService.update(param(req, 'id'), req.body);
+    const doc = await documentService.update(param(req, 'id'), req.body, req.user!.id);
     res.json({ success: true, data: doc });
   } catch (error) {
     next(error);
   }
 });
 
-// DELETE /documents/:id — LAWYER only (soft delete)
+// DELETE /documents/:id — LAWYER only (own, soft delete)
 documentsRouter.delete('/:id', authenticate, requireRole('LAWYER'), async (req, res, next) => {
   try {
-    await documentService.softDelete(param(req, 'id'));
+    await documentService.softDelete(param(req, 'id'), req.user!.id);
     res.json({ success: true, data: { message: 'Документ видалено' } });
   } catch (error) {
     next(error);

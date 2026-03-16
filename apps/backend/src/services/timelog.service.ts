@@ -39,9 +39,11 @@ export async function create(input: CreateTimeLogInput, lawyerUserId: string) {
     throw new AppError(400, 'Профіль адвоката не знайдено');
   }
 
-  // Verify case exists
-  const caseRecord = await prisma.case.findUnique({ where: { id: input.caseId } });
-  if (!caseRecord || caseRecord.deletedAt) {
+  // Bug 11 fix: verify case belongs to this lawyer
+  const caseRecord = await prisma.case.findFirst({
+    where: { id: input.caseId, lawyerId: lawyerProfile.id, deletedAt: null },
+  });
+  if (!caseRecord) {
     throw new AppError(404, 'Справу не знайдено');
   }
 
@@ -60,8 +62,17 @@ export async function create(input: CreateTimeLogInput, lawyerUserId: string) {
   });
 }
 
-export async function update(id: string, input: UpdateTimeLogInput) {
-  const existing = await prisma.timeLog.findUnique({ where: { id } });
+export async function update(id: string, input: UpdateTimeLogInput, lawyerUserId: string) {
+  const lawyerProfile = await prisma.lawyerProfile.findUnique({
+    where: { userId: lawyerUserId },
+  });
+  if (!lawyerProfile) {
+    throw new AppError(403, 'Профіль адвоката не знайдено');
+  }
+
+  const existing = await prisma.timeLog.findFirst({
+    where: { id, lawyerId: lawyerProfile.id },
+  });
   if (!existing) {
     throw new AppError(404, 'Запис часу не знайдено');
   }
@@ -75,8 +86,17 @@ export async function update(id: string, input: UpdateTimeLogInput) {
   });
 }
 
-export async function remove(id: string) {
-  const existing = await prisma.timeLog.findUnique({ where: { id } });
+export async function remove(id: string, lawyerUserId: string) {
+  const lawyerProfile = await prisma.lawyerProfile.findUnique({
+    where: { userId: lawyerUserId },
+  });
+  if (!lawyerProfile) {
+    throw new AppError(403, 'Профіль адвоката не знайдено');
+  }
+
+  const existing = await prisma.timeLog.findFirst({
+    where: { id, lawyerId: lawyerProfile.id },
+  });
   if (!existing) {
     throw new AppError(404, 'Запис часу не знайдено');
   }

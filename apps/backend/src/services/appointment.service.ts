@@ -212,7 +212,7 @@ export async function list(
   return { items, meta: { cursor: items.at(-1)?.id, hasMore } };
 }
 
-export async function getById(id: string) {
+export async function getById(id: string, userId?: string, userRole?: string) {
   const appointment = await prisma.appointment.findUnique({
     where: { id },
     include: {
@@ -231,6 +231,13 @@ export async function getById(id: string) {
 
   if (!appointment) {
     throw new AppError(404, 'Запис не знайдено');
+  }
+
+  if (userRole === 'LAWYER' && userId) {
+    const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
+    if (!profile || appointment.lawyerId !== profile.id) {
+      throw new AppError(403, 'Ви не маєте доступу до цього запису');
+    }
   }
 
   return appointment;
@@ -286,8 +293,9 @@ export async function create(
     lawyerId: input.lawyerId,
   });
 
+  // Bug 7 fix: CLIENT role always uses own profile, ignore payload clientId
   let clientId = input.clientId;
-  if (!clientId && userRole === 'CLIENT') {
+  if (userRole === 'CLIENT') {
     const profile = await prisma.clientProfile.findUnique({ where: { userId } });
     if (!profile) {
       throw new AppError(400, 'Профіль клієнта не знайдено');
@@ -392,8 +400,15 @@ export async function create(
   return created;
 }
 
-export async function update(id: string, input: UpdateAppointmentInput) {
-  const existing = await prisma.appointment.findUnique({ where: { id } });
+export async function update(id: string, input: UpdateAppointmentInput, userId: string) {
+  const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
+  if (!profile) {
+    throw new AppError(403, 'Профіль адвоката не знайдено');
+  }
+
+  const existing = await prisma.appointment.findFirst({
+    where: { id, lawyerId: profile.id },
+  });
   if (!existing) {
     throw new AppError(404, 'Запис не знайдено');
   }
@@ -418,8 +433,15 @@ export async function update(id: string, input: UpdateAppointmentInput) {
   });
 }
 
-export async function remove(id: string) {
-  const existing = await prisma.appointment.findUnique({ where: { id } });
+export async function remove(id: string, userId: string) {
+  const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
+  if (!profile) {
+    throw new AppError(403, 'Профіль адвоката не знайдено');
+  }
+
+  const existing = await prisma.appointment.findFirst({
+    where: { id, lawyerId: profile.id },
+  });
   if (!existing) {
     throw new AppError(404, 'Запис не знайдено');
   }

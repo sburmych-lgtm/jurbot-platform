@@ -126,7 +126,7 @@ appointmentsRouter.get('/:id', authenticate, async (req, res, next) => {
     if (req.user!.role === 'CLIENT') {
       await appointmentService.verifyClientAccess(id, req.user!.id);
     }
-    const appointment = await appointmentService.getById(id);
+    const appointment = await appointmentService.getById(id, req.user!.id, req.user!.role);
     res.json({ success: true, data: appointment });
   } catch (error) {
     next(error);
@@ -141,7 +141,7 @@ appointmentsRouter.patch(
   validate(updateAppointmentSchema),
   async (req, res, next) => {
     try {
-      const appointment = await appointmentService.update(param(req, 'id'), req.body);
+      const appointment = await appointmentService.update(param(req, 'id'), req.body, req.user!.id);
       res.json({ success: true, data: appointment });
     } catch (error) {
       next(error);
@@ -156,7 +156,7 @@ appointmentsRouter.delete(
   requireRole('LAWYER'),
   async (req, res, next) => {
     try {
-      await appointmentService.remove(param(req, 'id'));
+      await appointmentService.remove(param(req, 'id'), req.user!.id);
       res.json({ success: true, data: { message: 'Запис скасовано' } });
     } catch (error) {
       next(error);

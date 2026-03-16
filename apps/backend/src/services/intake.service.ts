@@ -74,12 +74,21 @@ export async function submit(input: IntakeSubmissionInput) {
   };
 }
 
-export async function list(params: PaginationParams) {
+export async function list(params: PaginationParams, userId: string) {
   const { cursor, limit = 20 } = params;
+
+  const lawyerProfile = await prisma.lawyerProfile.findUnique({
+    where: { userId },
+    select: { orgId: true },
+  });
+  if (!lawyerProfile?.orgId) return { items: [], meta: { hasMore: false } };
 
   const items = await prisma.intakeSubmission.findMany({
     take: limit + 1,
     ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+    where: {
+      client: { orgId: lawyerProfile.orgId },
+    },
     orderBy: { createdAt: 'desc' },
     include: {
       client: { include: { user: { select: { id: true, name: true, email: true, phone: true, city: true } } } },
@@ -91,7 +100,15 @@ export async function list(params: PaginationParams) {
   return { items, meta: { cursor: items.at(-1)?.id, hasMore } };
 }
 
-export async function getById(id: string) {
+export async function getById(id: string, userId: string) {
+  const lawyerProfile = await prisma.lawyerProfile.findUnique({
+    where: { userId },
+    select: { orgId: true },
+  });
+  if (!lawyerProfile?.orgId) {
+    throw new AppError(403, 'Профіль адвоката не знайдено');
+  }
+
   const submission = await prisma.intakeSubmission.findUnique({
     where: { id },
     include: {
@@ -102,6 +119,11 @@ export async function getById(id: string) {
   if (!submission) {
     throw new AppError(404, 'Звернення не знайдено');
   }
+
+  if (submission.client.orgId && submission.client.orgId !== lawyerProfile.orgId) {
+    throw new AppError(403, 'Ви не маєте доступу до цього звернення');
+  }
+
   return submission;
 }
 
@@ -120,6 +142,11 @@ export async function convertToCase(submissionId: string, lawyerUserId: string) 
   });
   if (!lawyerProfile) {
     throw new AppError(400, 'Профіль адвоката не знайдено');
+  }
+
+  // Bug 5 fix: verify org match before conversion
+  if (submission.client.orgId && lawyerProfile.orgId && submission.client.orgId !== lawyerProfile.orgId) {
+    throw new AppError(403, 'Звернення належить до іншої організації');
   }
 
   const caseNumber = generateCaseNumber();

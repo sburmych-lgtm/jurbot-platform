@@ -25,7 +25,7 @@ intakeRouter.post('/', intakeLimiter, validate(intakeSubmissionSchema), async (r
 intakeRouter.get('/', authenticate, requireRole('LAWYER'), async (req, res, next) => {
   try {
     const pagination = parsePagination(req.query as Record<string, unknown>);
-    const result = await intakeService.list(pagination);
+    const result = await intakeService.list(pagination, req.user!.id);
     res.json({ success: true, data: result.items, meta: result.meta });
   } catch (error) {
     next(error);
@@ -35,7 +35,7 @@ intakeRouter.get('/', authenticate, requireRole('LAWYER'), async (req, res, next
 // GET /intake/:id — LAWYER only
 intakeRouter.get('/:id', authenticate, requireRole('LAWYER'), async (req, res, next) => {
   try {
-    const submission = await intakeService.getById(param(req, 'id'));
+    const submission = await intakeService.getById(param(req, 'id'), req.user!.id);
     res.json({ success: true, data: submission });
   } catch (error) {
     next(error);

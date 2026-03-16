@@ -34,12 +34,29 @@ usersRouter.get('/', authenticate, requireRole('LAWYER'), async (req, res, next)
   }
 });
 
-// GET /users/:id — LAWYER or own CLIENT
+// GET /users/:id — LAWYER (same org) or own CLIENT
 usersRouter.get('/:id', authenticate, async (req, res, next) => {
   try {
     const id = param(req, 'id');
     if (req.user!.role === 'CLIENT' && req.user!.id !== id) {
       throw new AppError(403, 'Недостатньо прав доступу');
+    }
+    if (req.user!.role === 'LAWYER' && req.user!.id !== id) {
+      // Verify target user is in the same org
+      const lawyerProfile = await prisma.lawyerProfile.findUnique({
+        where: { userId: req.user!.id },
+        select: { orgId: true },
+      });
+      if (lawyerProfile?.orgId) {
+        const targetUser = await prisma.user.findUnique({
+          where: { id },
+          include: { lawyerProfile: { select: { orgId: true } }, clientProfile: { select: { orgId: true } } },
+        });
+        const targetOrgId = targetUser?.lawyerProfile?.orgId ?? targetUser?.clientProfile?.orgId;
+        if (targetOrgId && targetOrgId !== lawyerProfile.orgId) {
+          throw new AppError(403, 'Недостатньо прав доступу');
+        }
+      }
     }
     const user = await userService.getById(id);
     res.json({ success: true, data: user });

@@ -9,10 +9,13 @@ export async function list(params: PaginationParams & { userId?: string; role?: 
 
   const where: Record<string, unknown> = { deletedAt: null };
   if (role === 'CLIENT' && userId) {
-    // CLIENT sees only their own cases — find their client profile first
     const profile = await prisma.clientProfile.findUnique({ where: { userId } });
     if (!profile) return { items: [], meta: { hasMore: false } };
     where.clientId = profile.id;
+  } else if (role === 'LAWYER' && userId) {
+    const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
+    if (!profile) return { items: [], meta: { hasMore: false } };
+    where.lawyerId = profile.id;
   }
 
   const items = await prisma.case.findMany({
@@ -32,7 +35,7 @@ export async function list(params: PaginationParams & { userId?: string; role?: 
   return { items, meta: { cursor: items.at(-1)?.id, hasMore } };
 }
 
-export async function getById(id: string) {
+export async function getById(id: string, userId?: string, userRole?: string) {
   const caseRecord = await prisma.case.findUnique({
     where: { id },
     include: {
@@ -45,11 +48,18 @@ export async function getById(id: string) {
   if (!caseRecord || caseRecord.deletedAt) {
     throw new AppError(404, 'Справу не знайдено');
   }
+
+  if (userRole === 'LAWYER' && userId) {
+    const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
+    if (!profile || caseRecord.lawyerId !== profile.id) {
+      throw new AppError(403, 'Ви не маєте доступу до цієї справи');
+    }
+  }
+
   return caseRecord;
 }
 
 export async function create(input: CreateCaseInput, lawyerUserId: string) {
-  // Find lawyer profile
   const lawyerProfile = await prisma.lawyerProfile.findUnique({
     where: { userId: lawyerUserId },
   });
@@ -57,12 +67,16 @@ export async function create(input: CreateCaseInput, lawyerUserId: string) {
     throw new AppError(400, 'Профіль адвоката не знайдено');
   }
 
-  // Verify client profile exists
   const clientProfile = await prisma.clientProfile.findUnique({
     where: { id: input.clientId },
   });
   if (!clientProfile) {
     throw new AppError(400, 'Профіль клієнта не знайдено');
+  }
+
+  // Bug 2 fix: verify client belongs to the same org
+  if (clientProfile.orgId && lawyerProfile.orgId && clientProfile.orgId !== lawyerProfile.orgId) {
+    throw new AppError(403, 'Клієнт належить до іншої організації');
   }
 
   const caseNumber = generateCaseNumber();
@@ -85,9 +99,16 @@ export async function create(input: CreateCaseInput, lawyerUserId: string) {
   });
 }
 
-export async function update(id: string, input: UpdateCaseInput) {
-  const existing = await prisma.case.findUnique({ where: { id } });
-  if (!existing || existing.deletedAt) {
+export async function update(id: string, input: UpdateCaseInput, userId: string) {
+  const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
+  if (!profile) {
+    throw new AppError(403, 'Профіль адвоката не знайдено');
+  }
+
+  const existing = await prisma.case.findFirst({
+    where: { id, lawyerId: profile.id, deletedAt: null },
+  });
+  if (!existing) {
     throw new AppError(404, 'Справу не знайдено');
   }
 
@@ -105,9 +126,16 @@ export async function update(id: string, input: UpdateCaseInput) {
   });
 }
 
-export async function softDelete(id: string) {
-  const existing = await prisma.case.findUnique({ where: { id } });
-  if (!existing || existing.deletedAt) {
+export async function softDelete(id: string, userId: string) {
+  const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
+  if (!profile) {
+    throw new AppError(403, 'Профіль адвоката не знайдено');
+  }
+
+  const existing = await prisma.case.findFirst({
+    where: { id, lawyerId: profile.id, deletedAt: null },
+  });
+  if (!existing) {
     throw new AppError(404, 'Справу не знайдено');
   }
 
