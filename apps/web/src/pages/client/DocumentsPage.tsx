@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { FileText, FileUp, FolderOpen, X } from 'lucide-react';
 import { api } from '@/lib/api';
-import { pickAndDownloadFromDrive } from '@/lib/google-picker';
+import { openGoogleDrive, pickFileFromDevice } from '@/lib/google-picker';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -62,17 +62,9 @@ export function ClientDocumentsPage() {
     setUploading(false);
   };
 
-  const handlePickFromDrive = async () => {
-    try {
-      const file = await pickAndDownloadFromDrive();
-      if (file) {
-        setSelectedFile(file);
-        showToast(`Файл "${file.name}" обрано з Google Drive`);
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Помилка Google Drive';
-      showToast(msg);
-    }
+  const handlePickFromDrive = () => {
+    openGoogleDrive();
+    showToast('Google Drive відкрито. Завантажте файл, потім оберіть його з пристрою.');
   };
 
   if (loading) return <Spinner />;
@@ -90,7 +82,7 @@ export function ClientDocumentsPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.xlsx,.xls"
+              accept="*/*"
               onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
               className="hidden"
             />
@@ -140,7 +132,7 @@ export function ClientDocumentsPage() {
                     <path d="M15.928 7.5h-4.33l2.17 3.75z" fill="#2684FC"/>
                     <path d="M8.598 7.5l-1.33 2.31L5.1 3.75h4.33z" fill="#FFBA00"/>
                   </svg>
-                  Обрати з Google Drive
+                  Відкрити Google Drive
                 </button>
               </div>
             )}

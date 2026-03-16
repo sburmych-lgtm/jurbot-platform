@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, FileText, FileUp, Plus, Sparkles, X } from 'lucide-react';
 import { TEMPLATES, type DocumentTemplate } from '@jurbot/shared';
 import { api } from '@/lib/api';
-import { pickAndDownloadFromDrive } from '@/lib/google-picker';
+import { openGoogleDrive, pickFileFromDevice } from '@/lib/google-picker';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -386,17 +386,9 @@ export function LawyerDocumentsPage() {
 
                 <button
                   type="button"
-                  onClick={async () => {
-                    try {
-                      const file = await pickAndDownloadFromDrive();
-                      if (file) {
-                        setUploadFile(file);
-                        showToast(`Файл "${file.name}" обрано з Google Drive`);
-                      }
-                    } catch (err) {
-                      const msg = err instanceof Error ? err.message : 'Помилка Google Drive';
-                      showToast(msg);
-                    }
+                  onClick={() => {
+                    openGoogleDrive();
+                    showToast('Google Drive відкрито. Завантажте файл, потім оберіть його з пристрою.');
                   }}
                   className="mt-2 flex w-full items-center justify-center gap-2 rounded-[14px] border border-border-default bg-bg-tertiary px-4 py-3 text-sm font-medium text-accent-teal transition hover:border-accent-teal/40 hover:bg-accent-teal/5 active:scale-[0.98]"
                 >
@@ -408,7 +400,7 @@ export function LawyerDocumentsPage() {
                     <path d="M15.928 7.5h-4.33l2.17 3.75z" fill="#2684FC"/>
                     <path d="M8.598 7.5l-1.33 2.31L5.1 3.75h4.33z" fill="#FFBA00"/>
                   </svg>
-                  Обрати з Google Drive
+                  Відкрити Google Drive
                 </button>
               </div>
 

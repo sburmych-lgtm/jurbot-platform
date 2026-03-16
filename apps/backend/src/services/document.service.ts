@@ -5,6 +5,8 @@ import { config } from '../config.js';
 import type { PaginationParams } from '../utils/pagination.js';
 import type { CreateDocumentInput, UpdateDocumentInput, GenerateDocumentInput } from '@jurbot/shared';
 import { TEMPLATES } from '@jurbot/shared';
+import { notifyLawyerByUserId, notifyClientByUserId } from './crossbot.service.js';
+import { createNotification } from './notification.service.js';
 
 export async function list(params: PaginationParams & { userId?: string; role?: string }) {
   const { cursor, limit = 20, userId, role } = params;
@@ -83,7 +85,7 @@ async function verifyCaseOwnership(caseId: string, userId: string) {
 export async function create(input: CreateDocumentInput, userId: string) {
   await verifyCaseOwnership(input.caseId, userId);
 
-  return prisma.document.create({
+  const doc = await prisma.document.create({
     data: {
       name: input.name,
       caseId: input.caseId,
@@ -91,9 +93,37 @@ export async function create(input: CreateDocumentInput, userId: string) {
       content: input.content,
     },
     include: {
-      case: { select: { id: true, caseNumber: true, title: true } },
+      case: { select: { id: true, caseNumber: true, title: true, clientId: true } },
     },
   });
+
+  // Notify client about new document from lawyer
+  if (doc.case.clientId) {
+    const clientProfile = await prisma.clientProfile.findUnique({
+      where: { id: doc.case.clientId },
+      select: { userId: true },
+    });
+    if (clientProfile) {
+      const text =
+        '📄 <b>Новий документ по вашій справі</b>\n\n' +
+        `📋 Справа: ${doc.case.caseNumber ?? doc.case.title}\n` +
+        `📎 Документ: ${input.name}`;
+
+      await notifyClientByUserId(clientProfile.userId, {
+        text,
+        parseMode: 'HTML',
+      });
+
+      await createNotification({
+        userId: clientProfile.userId,
+        type: 'DOCUMENT_READY',
+        title: 'Новий документ',
+        body: `Адвокат додав документ "${input.name}" до вашої справи`,
+      });
+    }
+  }
+
+  return doc;
 }
 
 export async function update(id: string, input: UpdateDocumentInput, userId: string) {
@@ -221,7 +251,10 @@ ${fieldsSummary}
 
 /** Upload a document from CLIENT to their active case */
 export async function clientUpload(fileName: string, fileContent: string, userId: string) {
-  const profile = await prisma.clientProfile.findUnique({ where: { userId } });
+  const profile = await prisma.clientProfile.findUnique({
+    where: { userId },
+    include: { user: { select: { name: true } } },
+  });
   if (!profile) {
     throw new AppError(403, 'Профіль клієнта не знайдено');
   }
@@ -229,13 +262,14 @@ export async function clientUpload(fileName: string, fileContent: string, userId
   const activeCase = await prisma.case.findFirst({
     where: { clientId: profile.id, status: { not: 'COMPLETED' }, deletedAt: null },
     orderBy: { createdAt: 'desc' },
+    include: { lawyer: { select: { userId: true, orgId: true } } },
   });
 
   if (!activeCase) {
     throw new AppError(400, 'У вас немає активної справи для завантаження файлу');
   }
 
-  return prisma.document.create({
+  const doc = await prisma.document.create({
     data: {
       name: fileName,
       type: 'upload',
@@ -243,12 +277,36 @@ export async function clientUpload(fileName: string, fileContent: string, userId
       size: String(Buffer.byteLength(fileContent, 'utf-8')),
       status: 'DRAFT',
       caseId: activeCase.id,
-      orgId: profile.orgId,
+      orgId: profile.orgId ?? activeCase.lawyer?.orgId,
     },
     include: {
       case: { select: { id: true, caseNumber: true, title: true } },
     },
   });
+
+  // Notify lawyer about new client upload
+  if (activeCase.lawyer?.userId) {
+    const clientName = profile.user.name ?? 'Клієнт';
+    const text =
+      '📄 <b>Новий документ від клієнта</b>\n\n' +
+      `👤 Клієнт: ${clientName}\n` +
+      `📋 Справа: ${activeCase.caseNumber ?? activeCase.title}\n` +
+      `📎 Файл: ${fileName}`;
+
+    const telegramSent = await notifyLawyerByUserId(activeCase.lawyer.userId, {
+      text,
+      parseMode: 'HTML',
+    });
+
+    await createNotification({
+      userId: activeCase.lawyer.userId,
+      type: 'DOCUMENT_READY',
+      title: 'Новий документ від клієнта',
+      body: `${clientName} завантажив(-ла) файл "${fileName}"`,
+    });
+  }
+
+  return doc;
 }
 
 /** Verify that a CLIENT user has access to a specific document */
