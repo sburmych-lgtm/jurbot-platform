@@ -16,25 +16,31 @@ export interface ApiResponse<T = unknown> {
 class ApiClient {
   private accessToken: string | null = null;
 
+  private buildAuthHeaders(extra?: Record<string, string>): Record<string, string> {
+    const headers: Record<string, string> = {
+      ...(extra ?? {}),
+    };
+
+    if (isTelegramWebApp()) {
+      headers['X-Telegram-Init-Data'] = getInitData();
+    }
+
+    if (this.accessToken) {
+      headers.Authorization = `Bearer ${this.accessToken}`;
+    }
+
+    return headers;
+  }
+
   setToken(token: string | null) {
     this.accessToken = token;
   }
 
   async request<T>(path: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
-    const headers: Record<string, string> = {
+    const headers: Record<string, string> = this.buildAuthHeaders({
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string> | undefined),
-    };
-
-    // Telegram Mini App auth (primary)
-    if (isTelegramWebApp()) {
-      headers['X-Telegram-Init-Data'] = getInitData();
-    }
-
-    // JWT fallback (for dev/testing)
-    if (this.accessToken) {
-      headers.Authorization = `Bearer ${this.accessToken}`;
-    }
+    });
 
     const response = await fetch(`${API_BASE}${path}`, {
       ...options,
@@ -77,6 +83,35 @@ class ApiClient {
 
   delete<T>(path: string) {
     return this.request<T>(path, { method: 'DELETE' });
+  }
+
+  postForm<T>(path: string, formData: FormData) {
+    return this.request<T>(path, {
+      method: 'POST',
+      body: formData,
+      headers: this.buildAuthHeaders(),
+    });
+  }
+
+  async download(path: string): Promise<Blob> {
+    const response = await fetch(`${API_BASE}${path}`, {
+      method: 'GET',
+      headers: this.buildAuthHeaders(),
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      let message = 'Помилка завантаження';
+      try {
+        const json = (await response.json()) as ApiResponse;
+        message = json.error ?? message;
+      } catch {
+        // ignore JSON parse failures
+      }
+      throw new Error(message);
+    }
+
+    return response.blob();
   }
 }
 

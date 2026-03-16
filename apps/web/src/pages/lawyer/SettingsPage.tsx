@@ -39,6 +39,8 @@ interface TokenItem {
   createdAt: string;
 }
 
+type TokensResponse = TokenItem[] | { items: TokenItem[] };
+
 interface PricingPlan {
   key: string;
   title: string;
@@ -127,13 +129,17 @@ export function SettingsPage() {
       try {
         const [subRes, tokRes] = await Promise.all([
           api.get<SubData>('/v1/subscription'),
-          api.get<{ items: TokenItem[] }>('/v1/tokens'),
+          api.get<TokensResponse>('/v1/tokens'),
         ]);
 
         setSubData(subRes.data ?? null);
-        setTokens(tokRes.data?.items ?? []);
-      } catch {
-        // Keep the shell responsive even if one of the endpoints is unavailable.
+        const tokensData = tokRes.data;
+        const parsedTokens = Array.isArray(tokensData)
+          ? tokensData
+          : (tokensData?.items ?? []);
+        setTokens(parsedTokens);
+      } catch (error) {
+        console.error('[SettingsPage] Failed to fetch settings payload', error);
       }
 
       setLoading(false);
@@ -141,7 +147,7 @@ export function SettingsPage() {
   }, []);
 
   const copyInviteLink = async (token: string) => {
-    const link = `https://t.me/YurBotClientBot?start=inv_${token}`;
+    const link = `https://t.me/YurBotClientBot?start=${token}`;
 
     await navigator.clipboard.writeText(link);
     setCopiedToken(token);

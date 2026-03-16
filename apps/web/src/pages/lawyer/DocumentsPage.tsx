@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, FileText, FileUp, Plus, Sparkles, X } from 'lucide-react';
 import { TEMPLATES, type DocumentTemplate } from '@jurbot/shared';
 import { api } from '@/lib/api';
-import { openGoogleDrive, pickFileFromDevice } from '@/lib/google-picker';
+import { openGoogleDrive } from '@/lib/google-picker';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -27,6 +27,13 @@ interface DocItem {
   type: string;
   status: string;
   createdAt: string;
+  size?: string;
+}
+
+interface CaseItem {
+  id: string;
+  title: string;
+  caseNumber?: string;
 }
 
 interface CustomTemplate {
@@ -83,6 +90,7 @@ export function LawyerDocumentsPage() {
   const [view, setView] = useState<ViewState>('home');
   const [docs, setDocs] = useState<DocItem[]>([]);
   const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
+  const [cases, setCases] = useState<CaseItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedAiTemplate, setSelectedAiTemplate] = useState<DocumentTemplate | null>(null);
@@ -97,15 +105,26 @@ export function LawyerDocumentsPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [generating, setGenerating] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingToCase, setUploadingToCase] = useState(false);
+  const [uploadCaseId, setUploadCaseId] = useState('');
+  const [uploadCaseFile, setUploadCaseFile] = useState<File | null>(null);
+  const caseFileInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchDocs = async () => {
+    const res = await api.get<DocItem[]>('/v1/documents');
+    setDocs(res.data ?? []);
+  };
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.get<DocItem[]>('/v1/documents');
-        setDocs(res.data ?? []);
-      } catch {
-        // ignore
+        await Promise.all([
+          fetchDocs(),
+          api.get<CaseItem[]>('/v1/cases').then((res) => setCases(res.data ?? [])),
+        ]);
+      } catch (error) {
+        console.error('[LawyerDocumentsPage] Initial fetch failed', error);
       }
 
       setCustomTemplates(loadCustomTemplates());
@@ -239,6 +258,53 @@ export function LawyerDocumentsPage() {
       showToast('Не вдалося обробити файл');
     }
     setUploading(false);
+  };
+
+  const handleUploadToCase = async () => {
+    if (!uploadCaseId) {
+      showToast('Оберіть справу для завантаження');
+      return;
+    }
+    if (!uploadCaseFile) {
+      showToast('Оберіть файл');
+      return;
+    }
+
+    setUploadingToCase(true);
+    try {
+      const formData = new FormData();
+      formData.append('caseId', uploadCaseId);
+      formData.append('file', uploadCaseFile);
+      await api.postForm('/v1/documents/upload/lawyer', formData);
+
+      showToast('Файл додано до справи');
+      setUploadCaseFile(null);
+      if (caseFileInputRef.current) caseFileInputRef.current.value = '';
+      await fetchDocs();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Не вдалося завантажити файл';
+      showToast(message);
+      console.error('[LawyerDocumentsPage] Upload-to-case failed', err);
+    }
+    setUploadingToCase(false);
+  };
+
+  const downloadDocument = async (doc: DocItem) => {
+    try {
+      const blob = await api.download(`/v1/documents/${doc.id}/download`);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = doc.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Не вдалося завантажити документ';
+      showToast(message);
+      console.error('[LawyerDocumentsPage] Download failed', err);
+    }
   };
 
   if (loading) {
@@ -550,10 +616,66 @@ export function LawyerDocumentsPage() {
                   name={doc.name}
                   status={doc.status}
                   date={doc.createdAt}
+                  size={doc.size}
+                  onDownload={() => { void downloadDocument(doc); }}
                 />
               ))}
             </div>
           )}
+        </Card>
+
+        <Card>
+          <h2 className="text-lg font-semibold text-text-primary mb-3">Додати готовий файл у справу</h2>
+          <div className="space-y-3">
+            <select
+              value={uploadCaseId}
+              onChange={(event) => setUploadCaseId(event.target.value)}
+              className="w-full px-4 py-3 rounded-[14px] border border-border-default bg-bg-tertiary text-text-primary focus:border-accent-teal focus:outline-none text-base"
+            >
+              <option value="">Оберіть справу</option>
+              {cases.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {(item.caseNumber ? `${item.caseNumber} — ` : '') + item.title}
+                </option>
+              ))}
+            </select>
+
+            <input
+              ref={caseFileInputRef}
+              type="file"
+              accept="*/*"
+              onChange={(event) => setUploadCaseFile(event.target.files?.[0] ?? null)}
+              className="hidden"
+            />
+
+            {uploadCaseFile ? (
+              <div className="flex items-center gap-3 rounded-[14px] border border-accent-teal/30 bg-accent-teal/5 px-4 py-3">
+                <FileText size={18} className="text-accent-teal" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-text-primary truncate">{uploadCaseFile.name}</p>
+                  <p className="text-xs text-text-muted">{(uploadCaseFile.size / 1024).toFixed(1)} KB</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadCaseFile(null);
+                    if (caseFileInputRef.current) caseFileInputRef.current.value = '';
+                  }}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-text-secondary hover:bg-accent-red/20 hover:text-accent-red transition"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <Button size="lg" variant="secondary" className="w-full" onClick={() => caseFileInputRef.current?.click()}>
+                <FileUp size={18} /> Обрати файл
+              </Button>
+            )}
+
+            <Button size="lg" className="w-full" loading={uploadingToCase} onClick={handleUploadToCase}>
+              <FileUp size={18} /> Додати у справу
+            </Button>
+          </div>
         </Card>
       </div>
     </PageContainer>

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { createDocumentSchema, updateDocumentSchema, generateDocumentSchema } from '@jurbot/shared';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
@@ -7,8 +8,15 @@ import { parsePagination } from '../utils/pagination.js';
 import { param } from '../utils/params.js';
 import * as documentService from '../services/document.service.js';
 import { TEMPLATES } from '@jurbot/shared';
+import { config } from '../config.js';
+import { AppError } from '../middleware/errorHandler.js';
 
 export const documentsRouter = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: config.maxFileSize },
+});
 
 // GET /documents/templates — return available document templates
 documentsRouter.get('/templates', authenticate, requireRole('LAWYER'), (_req, res) => {
@@ -64,6 +72,23 @@ documentsRouter.get('/:id', authenticate, async (req, res, next) => {
   }
 });
 
+// GET /documents/:id/download — LAWYER (own) or assigned CLIENT
+documentsRouter.get('/:id/download', authenticate, async (req, res, next) => {
+  try {
+    const id = param(req, 'id');
+    if (req.user!.role === 'CLIENT') {
+      await documentService.verifyClientAccess(id, req.user!.id);
+    }
+
+    const payload = await documentService.getDownloadPayload(id, req.user!.id, req.user!.role);
+    res.setHeader('Content-Type', payload.mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(payload.fileName)}"`);
+    res.send(payload.content);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // PATCH /documents/:id — LAWYER only (own)
 documentsRouter.patch('/:id', authenticate, requireRole('LAWYER'), validate(updateDocumentSchema), async (req, res, next) => {
   try {
@@ -75,12 +100,42 @@ documentsRouter.patch('/:id', authenticate, requireRole('LAWYER'), validate(upda
 });
 
 // POST /documents/upload — CLIENT uploads a file to their active case
-documentsRouter.post('/upload', authenticate, async (req, res, next) => {
+documentsRouter.post('/upload', authenticate, upload.single('file'), async (req, res, next) => {
   try {
-    const name = (req.body?.name as string) || 'document';
-    // For now, store a reference; actual file bytes could be handled via multer later
-    const content = `upload:web:${name}:${Date.now()}`;
-    const doc = await documentService.clientUpload(name, content, req.user!.id);
+    if (!req.file) {
+      throw new AppError(400, 'Файл не передано');
+    }
+
+    const doc = await documentService.clientUpload({
+      originalName: req.file.originalname,
+      mimeType: req.file.mimetype || 'application/octet-stream',
+      sizeBytes: req.file.size,
+      buffer: req.file.buffer,
+    }, req.user!.id);
+    res.status(201).json({ success: true, data: doc });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /documents/upload/lawyer — LAWYER uploads a ready-made file into selected case
+documentsRouter.post('/upload/lawyer', authenticate, requireRole('LAWYER'), upload.single('file'), async (req, res, next) => {
+  try {
+    const caseId = typeof req.body?.caseId === 'string' ? req.body.caseId : '';
+    if (!caseId) {
+      throw new AppError(400, 'caseId обовʼязковий');
+    }
+    if (!req.file) {
+      throw new AppError(400, 'Файл не передано');
+    }
+
+    const doc = await documentService.lawyerUploadToCase({
+      originalName: req.file.originalname,
+      mimeType: req.file.mimetype || 'application/octet-stream',
+      sizeBytes: req.file.size,
+      buffer: req.file.buffer,
+    }, caseId, req.user!.id);
+
     res.status(201).json({ success: true, data: doc });
   } catch (error) {
     next(error);

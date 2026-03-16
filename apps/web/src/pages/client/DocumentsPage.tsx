@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { FileText, FileUp, FolderOpen, X } from 'lucide-react';
 import { api } from '@/lib/api';
-import { openGoogleDrive, pickFileFromDevice } from '@/lib/google-picker';
+import { openGoogleDrive } from '@/lib/google-picker';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -30,8 +30,8 @@ export function ClientDocumentsPage() {
     try {
       const res = await api.get<DocItem[]>('/v1/documents');
       setDocs(res.data ?? []);
-    } catch {
-      // ignore
+    } catch (error) {
+      console.error('[ClientDocumentsPage] Failed to fetch docs', error);
     }
   };
 
@@ -50,16 +50,39 @@ export function ClientDocumentsPage() {
 
     setUploading(true);
     try {
-      await api.post('/v1/documents/upload', { name: selectedFile.name });
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      await api.postForm('/v1/documents/upload', formData);
 
       showToast('Файл завантажено');
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       await fetchDocs();
-    } catch {
-      showToast('Помилка при завантаженні файлу');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Помилка при завантаженні файлу';
+      showToast(message);
+      console.error('[ClientDocumentsPage] Upload failed', err);
     }
     setUploading(false);
+  };
+
+  const downloadDocument = async (doc: DocItem) => {
+    try {
+      const blob = await api.download(`/v1/documents/${doc.id}/download`);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = doc.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Не вдалося завантажити документ';
+      showToast(message);
+      console.error('[ClientDocumentsPage] Download failed', err);
+    }
   };
 
   const handlePickFromDrive = () => {
@@ -157,7 +180,14 @@ export function ClientDocumentsPage() {
           ) : (
             <div className="space-y-2">
               {docs.map(d => (
-                <DocumentCard key={d.id} name={d.name} status={d.status} date={d.createdAt} size={d.size} />
+                <DocumentCard
+                  key={d.id}
+                  name={d.name}
+                  status={d.status}
+                  date={d.createdAt}
+                  size={d.size}
+                  onDownload={() => { void downloadDocument(d); }}
+                />
               ))}
             </div>
           )}

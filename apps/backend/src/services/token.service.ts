@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto';
 import { prisma } from '@jurbot/db';
-import type { TokenType } from '@prisma/client';
+
+type TokenType = 'PUBLIC_LAWYER' | 'PRIVATE_CASE';
 
 const TOKEN_PREFIX: Record<TokenType, string> = {
   PUBLIC_LAWYER: 'inv',

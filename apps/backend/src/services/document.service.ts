@@ -7,6 +7,22 @@ import type { CreateDocumentInput, UpdateDocumentInput, GenerateDocumentInput } 
 import { TEMPLATES } from '@jurbot/shared';
 import { notifyLawyerByUserId, notifyClientByUserId } from './crossbot.service.js';
 import { createNotification } from './notification.service.js';
+import type { Prisma } from '@jurbot/db';
+
+interface UploadedFileInput {
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  buffer: Buffer;
+}
+
+interface DownloadPayload {
+  fileName: string;
+  mimeType: string;
+  content: Buffer;
+}
+
+const INLINE_BASE64_PREFIX = 'base64:';
 
 export async function list(params: PaginationParams & { userId?: string; role?: string }) {
   const { cursor, limit = 20, userId, role } = params;
@@ -19,7 +35,7 @@ export async function list(params: PaginationParams & { userId?: string; role?: 
       where: { clientId: profile.id, deletedAt: null },
       select: { id: true },
     });
-    where.caseId = { in: caseIds.map((c) => c.id) };
+    where.caseId = { in: caseIds.map((c: { id: string }) => c.id) };
   } else if (role === 'LAWYER' && userId) {
     const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
     if (!profile) return { items: [], meta: { hasMore: false } };
@@ -27,7 +43,7 @@ export async function list(params: PaginationParams & { userId?: string; role?: 
       where: { lawyerId: profile.id, deletedAt: null },
       select: { id: true },
     });
-    where.caseId = { in: caseIds.map((c) => c.id) };
+    where.caseId = { in: caseIds.map((c: { id: string }) => c.id) };
   }
 
   const items = await prisma.document.findMany({
@@ -206,6 +222,49 @@ export async function generate(input: GenerateDocumentInput, userId: string) {
   };
 }
 
+function encodeInlineContent(buffer: Buffer): string {
+  return INLINE_BASE64_PREFIX + buffer.toString('base64');
+}
+
+function decodeInlineContent(raw: string): Buffer {
+  if (raw.startsWith(INLINE_BASE64_PREFIX)) {
+    return Buffer.from(raw.slice(INLINE_BASE64_PREFIX.length), 'base64');
+  }
+  return Buffer.from(raw, 'utf-8');
+}
+
+async function persistUploadedDocument(params: {
+  file: UploadedFileInput;
+  caseId: string;
+  orgId?: string | null;
+  uploadedById: string;
+}): Promise<void> {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const upload = await tx.upload.create({
+      data: {
+        originalName: params.file.originalName,
+        mimeType: params.file.mimeType,
+        sizeBytes: params.file.sizeBytes,
+        storagePath: 'inline-db',
+        uploadedById: params.uploadedById,
+      },
+    });
+
+    await tx.document.create({
+      data: {
+        name: params.file.originalName,
+        type: params.file.mimeType,
+        size: String(params.file.sizeBytes),
+        content: encodeInlineContent(params.file.buffer),
+        status: 'DRAFT',
+        caseId: params.caseId,
+        orgId: params.orgId ?? undefined,
+        uploadId: upload.id,
+      },
+    });
+  });
+}
+
 async function generateWithGemini(
   templateName: string,
   templateId: string,
@@ -250,7 +309,7 @@ ${fieldsSummary}
 }
 
 /** Upload a document from CLIENT to their active case */
-export async function clientUpload(fileName: string, fileContent: string, userId: string) {
+export async function clientUpload(file: UploadedFileInput, userId: string) {
   const profile = await prisma.clientProfile.findUnique({
     where: { userId },
     include: { user: { select: { name: true } } },
@@ -266,22 +325,17 @@ export async function clientUpload(fileName: string, fileContent: string, userId
   });
 
   if (!activeCase) {
-    throw new AppError(400, 'У вас немає активної справи для завантаження файлу');
+    throw new AppError(
+      400,
+      'У вас немає активної справи для завантаження файлу. Зверніться до адвоката або створіть новий запит.',
+    );
   }
 
-  const doc = await prisma.document.create({
-    data: {
-      name: fileName,
-      type: 'upload',
-      content: fileContent,
-      size: String(Buffer.byteLength(fileContent, 'utf-8')),
-      status: 'DRAFT',
-      caseId: activeCase.id,
-      orgId: profile.orgId ?? activeCase.lawyer?.orgId,
-    },
-    include: {
-      case: { select: { id: true, caseNumber: true, title: true } },
-    },
+  await persistUploadedDocument({
+    file,
+    caseId: activeCase.id,
+    orgId: profile.orgId ?? activeCase.lawyer?.orgId,
+    uploadedById: userId,
   });
 
   // Notify lawyer about new client upload
@@ -291,7 +345,7 @@ export async function clientUpload(fileName: string, fileContent: string, userId
       '📄 <b>Новий документ від клієнта</b>\n\n' +
       `👤 Клієнт: ${clientName}\n` +
       `📋 Справа: ${activeCase.caseNumber ?? activeCase.title}\n` +
-      `📎 Файл: ${fileName}`;
+      `📎 Файл: ${file.originalName}`;
 
     const telegramSent = await notifyLawyerByUserId(activeCase.lawyer.userId, {
       text,
@@ -302,11 +356,61 @@ export async function clientUpload(fileName: string, fileContent: string, userId
       userId: activeCase.lawyer.userId,
       type: 'DOCUMENT_READY',
       title: 'Новий документ від клієнта',
-      body: `${clientName} завантажив(-ла) файл "${fileName}"`,
+      body: `${clientName} завантажив(-ла) файл "${file.originalName}"`,
     });
   }
 
-  return doc;
+  return prisma.document.findFirstOrThrow({
+    where: {
+      caseId: activeCase.id,
+      name: file.originalName,
+      deletedAt: null,
+    },
+    orderBy: { createdAt: 'desc' },
+    include: { case: { select: { id: true, caseNumber: true, title: true } } },
+  });
+}
+
+export async function lawyerUploadToCase(
+  file: UploadedFileInput,
+  caseId: string,
+  userId: string,
+) {
+  const caseRecord = await verifyCaseOwnership(caseId, userId);
+
+  await persistUploadedDocument({
+    file,
+    caseId,
+    orgId: caseRecord.orgId,
+    uploadedById: userId,
+  });
+
+  return prisma.document.findFirstOrThrow({
+    where: {
+      caseId,
+      name: file.originalName,
+      deletedAt: null,
+    },
+    orderBy: { createdAt: 'desc' },
+    include: { case: { select: { id: true, caseNumber: true, title: true, clientId: true } } },
+  });
+}
+
+export async function getDownloadPayload(
+  id: string,
+  userId: string,
+  userRole: string,
+): Promise<DownloadPayload> {
+  const doc = await getById(id, userId, userRole);
+  if (!doc.content) {
+    throw new AppError(404, 'Вміст документа відсутній');
+  }
+
+  return {
+    fileName: doc.name,
+    mimeType: doc.type || 'application/octet-stream',
+    content: decodeInlineContent(doc.content),
+  };
 }
 
 /** Verify that a CLIENT user has access to a specific document */

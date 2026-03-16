@@ -149,14 +149,13 @@ appointmentsRouter.patch(
   },
 );
 
-// DELETE /appointments/:id — LAWYER only (cancel)
+// DELETE /appointments/:id — LAWYER or own CLIENT (cancel)
 appointmentsRouter.delete(
   '/:id',
   authenticate,
-  requireRole('LAWYER'),
   async (req, res, next) => {
     try {
-      await appointmentService.remove(param(req, 'id'), req.user!.id);
+      await appointmentService.remove(param(req, 'id'), req.user!.id, req.user!.role);
       res.json({ success: true, data: { message: 'Запис скасовано' } });
     } catch (error) {
       next(error);

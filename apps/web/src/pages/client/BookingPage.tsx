@@ -23,6 +23,13 @@ interface CreatedAppointment {
   refNumber: string;
 }
 
+interface AppointmentItem {
+  id: string;
+  refNumber: string;
+  date: string;
+  status: string;
+}
+
 export function BookingPage() {
   const { showToast } = useToast();
 
@@ -37,6 +44,20 @@ export function BookingPage() {
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [bookingLawyerId, setBookingLawyerId] = useState('');
+  const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
+
+  const fetchAppointments = async () => {
+    try {
+      const res = await api.get<AppointmentItem[]>('/v1/appointments');
+      setAppointments((res.data ?? []).filter((item) => item.status !== 'CANCELLED'));
+    } catch (error) {
+      console.error('[BookingPage] Failed to fetch appointments', error);
+    }
+  };
+
+  useEffect(() => {
+    void fetchAppointments();
+  }, []);
 
   useEffect(() => {
     if (!selectedDate) {
@@ -91,6 +112,7 @@ export function BookingPage() {
 
       setRefNumber(res.data?.refNumber ?? '');
       setStep(4);
+      await fetchAppointments();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Не вдалося створити запис';
       showToast(message);
@@ -107,6 +129,18 @@ export function BookingPage() {
     setRefNumber('');
     setAvailableSlots([]);
     setBookingLawyerId('');
+  };
+
+  const cancelAppointment = async (appointmentId: string) => {
+    try {
+      await api.delete(`/v1/appointments/${appointmentId}`);
+      showToast('Запис скасовано');
+      await fetchAppointments();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Не вдалося скасувати запис';
+      showToast(message);
+      console.error('[BookingPage] Failed to cancel appointment', err);
+    }
   };
 
   if (step === 4) {
@@ -241,6 +275,32 @@ export function BookingPage() {
             </Button>
           </div>
         )}
+
+        <Card>
+          <h2 className="text-sm font-semibold text-text-primary mb-3">Мої найближчі записи</h2>
+          {appointments.length === 0 ? (
+            <p className="text-sm text-text-secondary">Наразі немає активних записів.</p>
+          ) : (
+            <div className="space-y-2">
+              {appointments.slice(0, 3).map((item) => (
+                <div key={item.id} className="rounded-[12px] border border-border-default p-3">
+                  <p className="text-sm text-text-primary font-medium">#{item.refNumber}</p>
+                  <p className="text-xs text-text-muted mt-1">
+                    {new Date(item.date).toLocaleString('uk-UA')}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="mt-2"
+                    onClick={() => { void cancelAppointment(item.id); }}
+                  >
+                    Скасувати
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
       </div>
     </PageContainer>
   );

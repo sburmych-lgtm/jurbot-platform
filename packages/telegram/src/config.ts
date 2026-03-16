@@ -2,6 +2,7 @@ import { Bot, session, InlineKeyboard } from 'grammy';
 import type { Context, SessionFlavor } from 'grammy';
 import { randomBytes } from 'crypto';
 import { prisma } from '@jurbot/db';
+import type { Prisma } from '@jurbot/db';
 
 // ─── Session types ──────────────────────────────────────────
 interface OnboardingSession {
@@ -524,7 +525,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
       const specialties = (ctx.session.specialties ?? []) as Array<'FAMILY' | 'CIVIL' | 'COMMERCIAL' | 'CRIMINAL' | 'MILITARY' | 'MIGRATION' | 'REALESTATE' | 'LABOR' | 'OTHER'>;
 
       try {
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
           const phone = ctx.session.phone ?? '';
 
           const user = await tx.user.create({
@@ -776,7 +777,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
     ];
 
     if (profile?.specialties && profile.specialties.length > 0) {
-      const specText = profile.specialties.map(s => SPECIALIZATION_MAP[s] ?? s).join(', ');
+      const specText = profile.specialties.map((s: keyof typeof SPECIALIZATION_MAP) => SPECIALIZATION_MAP[s] ?? s).join(', ');
       lines.push('📋 Спеціалізація: ' + specText);
     }
 
@@ -879,7 +880,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
       return;
     }
 
-    const lines = cases.map((c, i) => (i + 1) + '. ' + c.title + ' [' + c.status + ']');
+    const lines = cases.map((c: { title: string; status: string }, i: number) => (i + 1) + '. ' + c.title + ' [' + c.status + ']');
     await ctx.reply('📁 Ваші справи:\n\n' + lines.join('\n'));
   });
 
@@ -906,7 +907,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
       return;
     }
 
-    const lines = appointments.map((a) => {
+    const lines = appointments.map((a: { date: Date; notes: string | null }) => {
       const time = a.date.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
       return '⏰ ' + time + (a.notes ? ' — ' + a.notes : '');
     });
@@ -938,7 +939,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
       return;
     }
 
-    const lines = cases.map((c, i) => `${i + 1}. ${c.title} [${c.status}]`);
+    const lines = cases.map((c: { title: string; status: string }, i: number) => `${i + 1}. ${c.title} [${c.status}]`);
     await ctx.reply('📁 Ваші справи:\n\n' + lines.join('\n'));
   });
 
@@ -965,7 +966,7 @@ export function createLawyerBot(opts: BotOptions): Bot {
       return;
     }
 
-    const lines = appointments.map((a) => {
+    const lines = appointments.map((a: { date: Date; notes?: string | null }) => {
       const time = a.date.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
       return `⏰ ${time}${a.notes ? ' — ' + a.notes : ''}`;
     });
@@ -1342,7 +1343,7 @@ export function createClientBot(opts: BotOptions): Bot {
       const sa = isSuperadmin(telegramId, superadminTelegramId);
 
       try {
-        await prisma.$transaction(async (tx) => {
+          await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
           const user = await tx.user.create({
             data: { name, phone, role: 'CLIENT', telegramId },
           });
@@ -1540,7 +1541,7 @@ export function createClientBot(opts: BotOptions): Bot {
       return;
     }
 
-    const lines = activeCases.map((c, i) => (i + 1) + '. ' + c.title + ' [' + c.status + ']');
+    const lines = activeCases.map((c: { title: string; status: string }, i: number) => (i + 1) + '. ' + c.title + ' [' + c.status + ']');
     await ctx.reply('📊 Ваші справи:\n\n' + lines.join('\n'));
   });
 
@@ -1563,7 +1564,7 @@ export function createClientBot(opts: BotOptions): Bot {
       return;
     }
 
-    const lines = upcoming.map((a) => {
+    const lines = upcoming.map((a: { date: Date }) => {
       const date = a.date.toLocaleDateString('uk-UA');
       const time = a.date.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
       return '📅 ' + date + ' ' + time;
@@ -1613,7 +1614,7 @@ export function createClientBot(opts: BotOptions): Bot {
       return;
     }
 
-    const lines = activeCases.map((c, i) => `${i + 1}. ${c.title} [${c.status}]`);
+    const lines = activeCases.map((c: { title: string; status: string }, i: number) => `${i + 1}. ${c.title} [${c.status}]`);
     await ctx.reply('📊 Ваші справи:\n\n' + lines.join('\n'));
   });
 
