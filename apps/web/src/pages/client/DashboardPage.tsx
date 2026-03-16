@@ -42,11 +42,11 @@ export function ClientDashboardPage() {
   const firstName = user?.name?.split(' ')[0] ?? 'друже';
 
   return (
-    <PageContainer className="space-y-4">
+    <PageContainer className="space-y-2.5 sm:space-y-4">
       <Card>
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.22em] text-text-muted">ЮрБот</p>
-          <h1 className="text-2xl font-semibold text-text-primary">Вітаємо, {firstName}</h1>
+        <div className="space-y-1.5 sm:space-y-2">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-text-muted sm:text-xs">ЮрБот</p>
+          <h1 className="text-xl font-semibold text-text-primary sm:text-2xl">Вітаємо, {firstName}</h1>
           <p className="text-sm text-text-secondary">
             Запис доступний через miniapp. Оберіть потрібну дію нижче.
           </p>

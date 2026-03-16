@@ -92,11 +92,11 @@ export function LawyerDashboardPage() {
   const firstName = user?.name?.split(' ')[0] ?? 'Колего';
 
   return (
-    <PageContainer className="space-y-4">
+    <PageContainer className="space-y-2.5 sm:space-y-4">
       <Card>
-        <div className="space-y-3">
-          <p className="text-xs uppercase tracking-[0.22em] text-text-muted">ЮрБот Pro</p>
-          <h1 className="text-2xl font-semibold text-text-primary">Вітаю, {firstName}</h1>
+        <div className="space-y-2 sm:space-y-3">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-text-muted sm:text-xs">ЮрБот Pro</p>
+          <h1 className="text-xl font-semibold text-text-primary sm:text-2xl">Вітаю, {firstName}</h1>
           {inviteLink ? (
             <div className="space-y-1.5">
               <p className="text-sm text-text-secondary">Посилання для ваших клієнтів:</p>

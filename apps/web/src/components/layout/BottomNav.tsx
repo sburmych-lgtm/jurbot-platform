@@ -45,30 +45,32 @@ export function BottomNav() {
   };
 
   return (
-    <nav className="glass-panel mt-6 rounded-[28px] p-2.5">
-      <div className="grid grid-cols-4 gap-2">
-        {tabs.map((tab) => {
-          const active = isActive(tab.path);
-          const Icon = tab.icon;
+    <nav className="fixed bottom-0 left-0 right-0 z-40 px-2.5 pb-[env(safe-area-inset-bottom,4px)] sm:px-4 sm:pb-2">
+      <div className="glass-panel mx-auto max-w-lg rounded-[20px] p-1.5 sm:rounded-[28px] sm:p-2.5">
+        <div className="grid grid-cols-4 gap-1 sm:gap-2">
+          {tabs.map((tab) => {
+            const active = isActive(tab.path);
+            const Icon = tab.icon;
 
-          return (
-            <button
-              key={tab.path}
-              type="button"
-              onClick={() => navigate(tab.path)}
-              className={`rounded-[18px] px-2 py-2.5 text-[10px] font-semibold transition-all ${
-                active
-                  ? 'bg-white/8 text-text-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'
-                  : 'text-text-muted hover:text-text-secondary'
-              }`}
-            >
-              <div className="flex flex-col items-center gap-1.5">
-                <Icon className="h-4 w-4" />
-                <span>{tab.label}</span>
-              </div>
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={tab.path}
+                type="button"
+                onClick={() => navigate(tab.path)}
+                className={`rounded-[14px] px-1.5 py-1.5 text-[10px] font-semibold transition-all sm:rounded-[18px] sm:px-2 sm:py-2.5 ${
+                  active
+                    ? 'bg-white/8 text-text-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'
+                    : 'text-text-muted hover:text-text-secondary'
+                }`}
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <Icon className="h-4 w-4" />
+                  <span>{tab.label}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );

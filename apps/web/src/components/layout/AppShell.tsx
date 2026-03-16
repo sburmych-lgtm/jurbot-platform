@@ -17,10 +17,10 @@ export function AppShell() {
         <div className="miniapp-grid" />
       </div>
 
-      <div className="relative min-h-screen">
-        <div className="mx-auto max-w-lg px-3 pb-24 sm:px-4 sm:pb-28">
+      <div className="relative min-h-screen pb-[72px] sm:pb-[88px]">
+        <div className="mx-auto max-w-lg px-2.5 sm:px-4">
           <Header />
-          <main className="pt-3 sm:pt-4">
+          <main className="pt-2 sm:pt-4">
             <Outlet />
           </main>
         </div>

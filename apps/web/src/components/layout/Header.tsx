@@ -54,41 +54,38 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 pt-2">
-      <div className="glass-panel rounded-[24px] px-4 py-3">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className={`flex h-11 w-11 items-center justify-center rounded-[14px] shadow-[0_18px_36px_rgba(0,0,0,0.24)] ${accentClass}`}>
-              <RoleIcon size={20} className="text-[#050810]" />
+    <header className="sticky top-0 z-40 pt-1 sm:pt-2">
+      <div className="glass-panel rounded-[16px] px-3 py-1.5 sm:rounded-[24px] sm:px-4 sm:py-3">
+        <div className="flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] shadow-[0_12px_24px_rgba(0,0,0,0.24)] sm:h-11 sm:w-11 sm:rounded-[14px] ${accentClass}`}>
+              <RoleIcon size={16} className="text-[#050810]" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="text-[11px] uppercase tracking-[0.24em] text-text-muted">ЮрБот</p>
-                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-text-secondary">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-text-muted sm:text-[11px]">ЮрБот</p>
+                <span className="rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-text-secondary sm:px-2.5 sm:py-1 sm:text-[10px]">
                   {roleLabel}
                 </span>
               </div>
-              <h1 className="font-display text-[1.4rem] leading-none text-text-primary sm:text-[1.7rem]">{title}</h1>
-              <p className="mt-0.5 text-sm text-text-secondary sm:mt-1">
-                {user ? user.name : 'Єдиний цифровий контур для юриста та клієнта'}
-              </p>
+              <h1 className="font-display text-[1.1rem] leading-tight text-text-primary sm:text-[1.7rem] sm:leading-none truncate">{title}</h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <button
               onClick={() => navigate(`${basePath}/notifications`)}
-              className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-white/10 bg-white/5 text-text-secondary transition hover:border-white/20 hover:text-text-primary"
+              className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-white/10 bg-white/5 text-text-secondary transition hover:border-white/20 hover:text-text-primary sm:h-11 sm:w-11 sm:rounded-[14px]"
               aria-label="Сповіщення"
             >
-              <Bell size={18} />
+              <Bell size={16} />
             </button>
             <button
               onClick={handleLogout}
-              className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-white/10 bg-white/5 text-text-secondary transition hover:border-white/20 hover:text-text-primary"
+              className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-white/10 bg-white/5 text-text-secondary transition hover:border-white/20 hover:text-text-primary sm:h-11 sm:w-11 sm:rounded-[14px]"
               aria-label="Вийти"
             >
-              <LogOut size={18} />
+              <LogOut size={16} />
             </button>
           </div>
         </div>
