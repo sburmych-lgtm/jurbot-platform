@@ -185,7 +185,7 @@ describe('Bug 4: appointments - cross-lawyer IDOR', () => {
     mockPrisma.lawyerProfile.findUnique.mockResolvedValue(LAWYER_A);
     mockPrisma.appointment.findFirst.mockResolvedValue(null);
 
-    await expect(remove('apt-1', 'user-a')).rejects.toThrow('не знайдено');
+    await expect(remove('apt-1', 'user-a', 'LAWYER')).rejects.toThrow('не знайдено');
   });
 });
 

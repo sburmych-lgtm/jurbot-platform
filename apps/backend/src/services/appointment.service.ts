@@ -332,7 +332,7 @@ export async function create(
     select: { date: true, duration: true },
   });
 
-  const conflict = activeAppointments.some((item) =>
+  const conflict = activeAppointments.some((item: { date: Date; duration: number }) =>
     overlaps(
       appointmentDate,
       endDate,
@@ -433,17 +433,32 @@ export async function update(id: string, input: UpdateAppointmentInput, userId: 
   });
 }
 
-export async function remove(id: string, userId: string) {
-  const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
-  if (!profile) {
-    throw new AppError(403, 'Профіль адвоката не знайдено');
+export async function remove(id: string, userId: string, userRole: string) {
+  let where: Record<string, unknown> = { id };
+
+  if (userRole === 'LAWYER') {
+    const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
+    if (!profile) {
+      throw new AppError(403, 'Профіль адвоката не знайдено');
+    }
+    where = { ...where, lawyerId: profile.id };
+  } else if (userRole === 'CLIENT') {
+    const profile = await prisma.clientProfile.findUnique({ where: { userId } });
+    if (!profile) {
+      throw new AppError(403, 'Профіль клієнта не знайдено');
+    }
+    where = { ...where, clientId: profile.id };
+  } else {
+    throw new AppError(403, 'Недостатньо прав доступу');
   }
 
-  const existing = await prisma.appointment.findFirst({
-    where: { id, lawyerId: profile.id },
-  });
+  const existing = await prisma.appointment.findFirst({ where });
   if (!existing) {
     throw new AppError(404, 'Запис не знайдено');
+  }
+
+  if (existing.status === 'CANCELLED') {
+    throw new AppError(400, 'Запис вже скасовано');
   }
 
   await prisma.appointment.update({

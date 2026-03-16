@@ -1,6 +1,7 @@
 import { prisma } from '@jurbot/db';
-import type { SubscriptionPlan } from '@prisma/client';
 import { config } from '../config.js';
+
+type SubscriptionPlan = 'TRIAL' | 'BASIC' | 'PRO' | 'BUREAU';
 
 const TRIAL_DAYS = 14;
 
@@ -36,7 +37,11 @@ const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
 };
 
 export function getPlanLimits(plan: SubscriptionPlan): PlanLimits {
-  return PLAN_LIMITS[plan];
+  const limits = PLAN_LIMITS[plan];
+  if (!limits) {
+    throw new Error(`Невідомий план підписки: ${String(plan)}`);
+  }
+  return limits;
 }
 
 export async function createTrialSubscription(orgId: string) {

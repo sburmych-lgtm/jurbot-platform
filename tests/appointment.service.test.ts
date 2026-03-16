@@ -7,7 +7,7 @@ const { mockPrisma } = vi.hoisted(() => {
       lawyerProfile: { findUnique: fn(), findFirst: fn() },
       clientProfile: { findUnique: fn() },
       lawyerAvailability: { findUnique: fn(), upsert: fn() },
-      appointment: { findMany: fn(), create: fn(), findUnique: fn() },
+      appointment: { findMany: fn(), create: fn(), findUnique: fn(), findFirst: fn(), update: fn() },
       notification: { create: fn() },
     },
   };
@@ -189,5 +189,30 @@ describe('appointment service', () => {
       }),
     );
     expect(result.configuredSlots).toEqual(['09:00', '10:00', '14:00']);
+  });
+
+  it('allows client to cancel own appointment', async () => {
+    const { remove } = await importService();
+
+    mockPrisma.clientProfile.findUnique.mockResolvedValue({
+      id: 'cp-1',
+      userId: 'cu-1',
+    });
+    mockPrisma.appointment.findFirst.mockResolvedValue({
+      id: 'a-1',
+      status: 'PENDING',
+      clientId: 'cp-1',
+    });
+    mockPrisma.appointment.update.mockResolvedValue({ id: 'a-1', status: 'CANCELLED' });
+
+    await remove('a-1', 'cu-1', 'CLIENT');
+
+    expect(mockPrisma.appointment.findFirst).toHaveBeenCalledWith({
+      where: { id: 'a-1', clientId: 'cp-1' },
+    });
+    expect(mockPrisma.appointment.update).toHaveBeenCalledWith({
+      where: { id: 'a-1' },
+      data: { status: 'CANCELLED' },
+    });
   });
 });
