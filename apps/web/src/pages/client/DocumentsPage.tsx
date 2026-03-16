@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { FileText, FileUp, FolderOpen, X } from 'lucide-react';
 import { api } from '@/lib/api';
+import { pickAndDownloadFromDrive } from '@/lib/google-picker';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -49,13 +50,7 @@ export function ClientDocumentsPage() {
 
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('name', selectedFile.name);
-
-      await api.post('/v1/documents/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      await api.post('/v1/documents/upload', { name: selectedFile.name });
 
       showToast('Файл завантажено');
       setSelectedFile(null);
@@ -65,6 +60,19 @@ export function ClientDocumentsPage() {
       showToast('Помилка при завантаженні файлу');
     }
     setUploading(false);
+  };
+
+  const handlePickFromDrive = async () => {
+    try {
+      const file = await pickAndDownloadFromDrive();
+      if (file) {
+        setSelectedFile(file);
+        showToast(`Файл "${file.name}" обрано з Google Drive`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Помилка Google Drive';
+      showToast(msg);
+    }
   };
 
   if (loading) return <Spinner />;
@@ -109,14 +117,32 @@ export function ClientDocumentsPage() {
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-dashed border-border-light bg-bg-tertiary px-4 py-3.5 text-sm font-medium text-text-secondary transition hover:border-accent-teal/50 hover:text-accent-teal active:scale-[0.98]"
-              >
-                <FileUp size={18} />
-                Обрати файл
-              </button>
+              <div className="grid grid-cols-1 gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-dashed border-border-light bg-bg-tertiary px-4 py-3.5 text-sm font-medium text-text-secondary transition hover:border-accent-teal/50 hover:text-accent-teal active:scale-[0.98]"
+                >
+                  <FileUp size={18} />
+                  Обрати файл з пристрою
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePickFromDrive}
+                  className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-border-default bg-bg-tertiary px-4 py-3 text-sm font-medium text-accent-teal transition hover:border-accent-teal/40 hover:bg-accent-teal/5 active:scale-[0.98]"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0">
+                    <path d="M4.433 22l-2.165-3.75L8.598 7.5h4.33L6.6 18.25z" fill="#0066DA"/>
+                    <path d="M14.17 22H9.84l3.03-5.25h8.66l-2.17 3.75z" fill="#00AC47"/>
+                    <path d="M7.268 7.5L5.1 3.75h8.66L15.93 7.5z" fill="#EA4335"/>
+                    <path d="M19.365 16.75h-8.66l2.17-3.75 4.33-7.5 2.165 3.75z" fill="#00832D"/>
+                    <path d="M15.928 7.5h-4.33l2.17 3.75z" fill="#2684FC"/>
+                    <path d="M8.598 7.5l-1.33 2.31L5.1 3.75h4.33z" fill="#FFBA00"/>
+                  </svg>
+                  Обрати з Google Drive
+                </button>
+              </div>
             )}
 
             <Button
