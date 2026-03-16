@@ -19,7 +19,7 @@ export function InputField({ icon: Icon, label, error, onChange, className, ...p
       <input
         onChange={e => onChange?.(e.target.value)}
         className={cn(
-          'w-full px-4 py-3 rounded-[14px] border border-border-default bg-bg-tertiary text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-teal transition',
+          'w-full px-4 py-3 rounded-[14px] border border-border-default bg-bg-tertiary text-base text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-teal transition',
           error && 'border-accent-red focus:border-accent-red',
         )}
         {...props}

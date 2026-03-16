@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, FileUp, Plus, Sparkles } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, FileText, FileUp, Plus, Sparkles, X } from 'lucide-react';
 import { TEMPLATES, type DocumentTemplate } from '@jurbot/shared';
 import { api } from '@/lib/api';
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -96,6 +96,7 @@ export function LawyerDocumentsPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [generating, setGenerating] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     (async () => {
@@ -323,35 +324,84 @@ export function LawyerDocumentsPage() {
                   value={uploadName}
                   onChange={(event) => setUploadName(event.target.value)}
                   placeholder="Наприклад: Договір про надання послуг"
-                  className="w-full px-4 py-3 rounded-[14px] border border-border-default bg-bg-tertiary text-text-primary placeholder-text-muted focus:border-accent-teal focus:outline-none text-sm"
+                  className="w-full px-4 py-3 rounded-[14px] border border-border-default bg-bg-tertiary text-text-primary placeholder-text-muted focus:border-accent-teal focus:outline-none text-base"
                 />
               </div>
 
               <div>
-                <label className="text-sm font-medium text-text-secondary mb-1 block">
+                <label className="text-sm font-medium text-text-secondary mb-2 block">
                   Файл шаблону
                 </label>
+
+                {/* Hidden native file input */}
                 <input
+                  ref={fileInputRef}
                   type="file"
                   accept=".txt,.md,.html,.doc,.docx"
                   onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
-                  className="w-full text-sm text-text-secondary"
+                  className="hidden"
                 />
-                <p className="text-xs text-text-muted mt-2">
-                  Використовуйте плейсхолдери у форматі <code>{'{{ПІБ_Клієнта}}'}</code>,
-                  <code>{'{{Дата}}'}</code> для автозаповнення.
+
+                {uploadFile ? (
+                  /* File selected — show preview card with cancel */
+                  <div className="flex items-center gap-3 rounded-[14px] border border-accent-teal/30 bg-accent-teal/5 px-4 py-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent-teal/15 text-accent-teal">
+                      <FileText size={22} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-text-primary truncate">{uploadFile.name}</p>
+                      <p className="text-xs text-text-muted">
+                        {(uploadFile.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUploadFile(null);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-text-secondary hover:bg-accent-red/20 hover:text-accent-red transition"
+                      aria-label="Видалити файл"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  /* No file — show styled pick button */
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-dashed border-border-light bg-bg-tertiary px-4 py-3.5 text-sm font-medium text-text-secondary transition hover:border-accent-teal/50 hover:text-accent-teal active:scale-[0.98]"
+                  >
+                    <FileUp size={18} />
+                    Обрати файл з пристрою
+                  </button>
+                )}
+
+                <p className="text-xs text-text-muted mt-2.5">
+                  Використовуйте плейсхолдери у форматі <code className="text-accent-teal/70">{'{{ПІБ_Клієнта}}'}</code>,{' '}
+                  <code className="text-accent-teal/70">{'{{Дата}}'}</code> для автозаповнення.
                 </p>
-                <p className="text-xs text-text-muted mt-1">
-                  Для Google Drive: відкрийте файл у Drive, завантажте на пристрій і оберіть тут.
-                </p>
-                <a
-                  href="https://drive.google.com"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex mt-2 text-sm text-accent-teal hover:text-accent-teal/80"
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Open Google Drive export page so user downloads the file, then picks it locally
+                    window.open('https://drive.google.com/drive/my-drive', '_blank', 'noopener');
+                    showToast('Завантажте файл з Drive на пристрій, потім оберіть його тут');
+                  }}
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-[14px] border border-border-default bg-bg-tertiary px-4 py-3 text-sm font-medium text-accent-teal transition hover:border-accent-teal/40 hover:bg-accent-teal/5 active:scale-[0.98]"
                 >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0">
+                    <path d="M4.433 22l-2.165-3.75L8.598 7.5h4.33L6.6 18.25z" fill="#0066DA"/>
+                    <path d="M14.17 22H9.84l3.03-5.25h8.66l-2.17 3.75z" fill="#00AC47"/>
+                    <path d="M7.268 7.5L5.1 3.75h8.66L15.93 7.5z" fill="#EA4335"/>
+                    <path d="M19.365 16.75h-8.66l2.17-3.75 4.33-7.5 2.165 3.75z" fill="#00832D"/>
+                    <path d="M15.928 7.5h-4.33l2.17 3.75z" fill="#2684FC"/>
+                    <path d="M8.598 7.5l-1.33 2.31L5.1 3.75h4.33z" fill="#FFBA00"/>
+                  </svg>
                   Відкрити Google Drive
-                </a>
+                </button>
               </div>
 
               <Button size="lg" className="w-full" loading={uploading} onClick={handleUploadTemplate}>
@@ -393,7 +443,7 @@ export function LawyerDocumentsPage() {
                       onChange={(event) =>
                         setFormValues((prev) => ({ ...prev, [field]: event.target.value }))
                       }
-                      className="w-full px-4 py-3 rounded-[14px] border border-border-default bg-bg-tertiary text-text-primary placeholder-text-muted focus:border-accent-teal focus:outline-none text-sm"
+                      className="w-full px-4 py-3 rounded-[14px] border border-border-default bg-bg-tertiary text-text-primary placeholder-text-muted focus:border-accent-teal focus:outline-none text-base"
                     />
                   </div>
                 ))}
