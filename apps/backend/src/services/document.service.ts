@@ -347,7 +347,7 @@ export async function clientUpload(file: UploadedFileInput, userId: string) {
       `📋 Справа: ${activeCase.caseNumber ?? activeCase.title}\n` +
       `📎 Файл: ${file.originalName}`;
 
-    const telegramSent = await notifyLawyerByUserId(activeCase.lawyer.userId, {
+    await notifyLawyerByUserId(activeCase.lawyer.userId, {
       text,
       parseMode: 'HTML',
     });

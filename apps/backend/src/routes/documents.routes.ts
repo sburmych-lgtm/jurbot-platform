@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler, type Request, type Response } from 'express';
 import multer from 'multer';
 import { createDocumentSchema, updateDocumentSchema, generateDocumentSchema } from '@jurbot/shared';
 import { authenticate } from '../middleware/auth.js';
@@ -17,6 +17,24 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: config.maxFileSize },
 });
+
+function withUpload(fieldName: string): RequestHandler {
+  return (req, res, next) => {
+    upload.single(fieldName)(req as Request, res as Response, (err: unknown) => {
+      if (!err) {
+        next();
+        return;
+      }
+
+      if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+        next(new AppError(400, `Файл завеликий. Максимальний розмір: ${Math.floor(config.maxFileSize / 1024 / 1024)} МБ`));
+        return;
+      }
+
+      next(err as Error);
+    });
+  };
+}
 
 // GET /documents/templates — return available document templates
 documentsRouter.get('/templates', authenticate, requireRole('LAWYER'), (_req, res) => {
@@ -100,7 +118,7 @@ documentsRouter.patch('/:id', authenticate, requireRole('LAWYER'), validate(upda
 });
 
 // POST /documents/upload — CLIENT uploads a file to their active case
-documentsRouter.post('/upload', authenticate, upload.single('file'), async (req, res, next) => {
+documentsRouter.post('/upload', authenticate, withUpload('file'), async (req, res, next) => {
   try {
     if (!req.file) {
       throw new AppError(400, 'Файл не передано');
@@ -119,7 +137,7 @@ documentsRouter.post('/upload', authenticate, upload.single('file'), async (req,
 });
 
 // POST /documents/upload/lawyer — LAWYER uploads a ready-made file into selected case
-documentsRouter.post('/upload/lawyer', authenticate, requireRole('LAWYER'), upload.single('file'), async (req, res, next) => {
+documentsRouter.post('/upload/lawyer', authenticate, requireRole('LAWYER'), withUpload('file'), async (req, res, next) => {
   try {
     const caseId = typeof req.body?.caseId === 'string' ? req.body.caseId : '';
     if (!caseId) {

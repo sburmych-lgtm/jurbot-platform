@@ -102,7 +102,14 @@ export function BookingPage() {
 
     setLoading(true);
     try {
-      const dateTime = `${selectedDate}T${selectedTime}:00`;
+      const localDateTime = new Date(`${selectedDate}T${selectedTime}:00`);
+      if (Number.isNaN(localDateTime.getTime())) {
+        showToast('Некоректні дата або час. Перевірте вибраний слот.');
+        setLoading(false);
+        return;
+      }
+
+      const dateTime = localDateTime.toISOString();
       const res = await api.post<CreatedAppointment>('/v1/appointments', {
         date: dateTime,
         type,

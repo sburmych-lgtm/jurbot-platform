@@ -184,13 +184,13 @@ export function ClientDocumentsPage() {
                       onClick={() => cameraInputRef.current?.click()}
                       className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border-default bg-bg-tertiary px-3 py-2.5 text-sm text-accent-teal hover:border-accent-teal/40"
                     >
-                      <Camera size={16} /> Сканувати (камера)
+                      <Camera size={16} /> Камера / фото документа
                     </button>
                   </div>
                 ) : null}
 
                 <p className="text-xs text-text-muted">
-                  "Сканувати" відкриває камеру пристрою. Якщо сканер Telegram/WebView недоступний, файл буде додано як фото документа.
+                  Кнопка відкриває камеру пристрою для фото документа (не нативний сканер).
                 </p>
               </div>
             )}
