@@ -1,13 +1,12 @@
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
-import { getBotSource } from '@/lib/telegram';
+import { resolveUiRole } from '@/lib/telegram';
 import { Header } from './Header';
 import { BottomNav } from './BottomNav';
 
 export function AppShell() {
   const { user } = useAuth();
-  const botSource = getBotSource();
-  const role = botSource === 'client' ? 'client' : (botSource === 'lawyer' || user?.role === 'LAWYER') ? 'lawyer' : 'client';
+  const role = user ? resolveUiRole(user.role).role.toLowerCase() as 'lawyer' | 'client' : 'client';
 
   return (
     <div className={`miniapp-shell miniapp-shell--${role}`}>

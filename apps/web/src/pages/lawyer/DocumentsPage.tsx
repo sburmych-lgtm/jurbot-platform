@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, FileText, FileUp, Plus, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, Camera, FileImage, FileText, FileUp, FolderOpen, Images, Plus, Sparkles, X } from 'lucide-react';
 import { TEMPLATES, type DocumentTemplate } from '@jurbot/shared';
 import { api } from '@/lib/api';
-import { openGoogleDrive } from '@/lib/google-picker';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -109,7 +108,13 @@ export function LawyerDocumentsPage() {
   const [uploadCaseId, setUploadCaseId] = useState('');
   const [uploadCaseFile, setUploadCaseFile] = useState<File | null>(null);
   const caseFileInputRef = useRef<HTMLInputElement>(null);
+  const caseGalleryInputRef = useRef<HTMLInputElement>(null);
+  const caseCameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [showTemplateSourcePicker, setShowTemplateSourcePicker] = useState(false);
+  const [showCaseSourcePicker, setShowCaseSourcePicker] = useState(false);
 
   const fetchDocs = async () => {
     const res = await api.get<DocItem[]>('/v1/documents');
@@ -280,6 +285,8 @@ export function LawyerDocumentsPage() {
       showToast('Файл додано до справи');
       setUploadCaseFile(null);
       if (caseFileInputRef.current) caseFileInputRef.current.value = '';
+      if (caseGalleryInputRef.current) caseGalleryInputRef.current.value = '';
+      if (caseCameraInputRef.current) caseCameraInputRef.current.value = '';
       await fetchDocs();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Не вдалося завантажити файл';
@@ -400,20 +407,42 @@ export function LawyerDocumentsPage() {
                   Файл шаблону
                 </label>
 
-                {/* Hidden native file input */}
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".txt,.md,.html,.doc,.docx"
-                  onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
+                  accept=".txt,.md,.html,.doc,.docx,application/pdf"
+                  onChange={(event) => {
+                    setUploadFile(event.target.files?.[0] ?? null);
+                    setShowTemplateSourcePicker(false);
+                  }}
+                  className="hidden"
+                />
+                <input
+                  ref={galleryInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => {
+                    setUploadFile(event.target.files?.[0] ?? null);
+                    setShowTemplateSourcePicker(false);
+                  }}
+                  className="hidden"
+                />
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(event) => {
+                    setUploadFile(event.target.files?.[0] ?? null);
+                    setShowTemplateSourcePicker(false);
+                  }}
                   className="hidden"
                 />
 
                 {uploadFile ? (
-                  /* File selected — show preview card with cancel */
                   <div className="flex items-center gap-3 rounded-[14px] border border-accent-teal/30 bg-accent-teal/5 px-4 py-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent-teal/15 text-accent-teal">
-                      <FileText size={22} />
+                      {uploadFile.type.startsWith('image/') ? <FileImage size={22} /> : <FileText size={22} />}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-text-primary truncate">{uploadFile.name}</p>
@@ -426,6 +455,8 @@ export function LawyerDocumentsPage() {
                       onClick={() => {
                         setUploadFile(null);
                         if (fileInputRef.current) fileInputRef.current.value = '';
+                        if (galleryInputRef.current) galleryInputRef.current.value = '';
+                        if (cameraInputRef.current) cameraInputRef.current.value = '';
                       }}
                       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-text-secondary hover:bg-accent-red/20 hover:text-accent-red transition"
                       aria-label="Видалити файл"
@@ -434,40 +465,33 @@ export function LawyerDocumentsPage() {
                     </button>
                   </div>
                 ) : (
-                  /* No file — show styled pick button */
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-dashed border-border-light bg-bg-tertiary px-4 py-3.5 text-sm font-medium text-text-secondary transition hover:border-accent-teal/50 hover:text-accent-teal active:scale-[0.98]"
-                  >
-                    <FileUp size={18} />
-                    Обрати файл з пристрою
-                  </button>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowTemplateSourcePicker((prev) => !prev)}
+                      className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-dashed border-border-light bg-bg-tertiary px-4 py-3.5 text-sm font-medium text-text-secondary transition hover:border-accent-teal/50 hover:text-accent-teal active:scale-[0.98]"
+                    >
+                      <FileUp size={18} />
+                      Завантажити файл
+                    </button>
+
+                    {showTemplateSourcePicker ? (
+                      <div className="grid grid-cols-1 gap-2 rounded-[14px] border border-border-default bg-bg-tertiary/60 p-2">
+                        <button type="button" onClick={() => fileInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border-default bg-bg-tertiary px-3 py-2.5 text-sm text-text-secondary hover:border-accent-teal/40"><FolderOpen size={16} /> Файли</button>
+                        <button type="button" onClick={() => galleryInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border-default bg-bg-tertiary px-3 py-2.5 text-sm text-text-secondary hover:border-accent-teal/40"><Images size={16} /> Галерея / Фото</button>
+                        <button type="button" onClick={() => cameraInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border-default bg-bg-tertiary px-3 py-2.5 text-sm text-accent-teal hover:border-accent-teal/40"><Camera size={16} /> Сканувати (камера)</button>
+                      </div>
+                    ) : null}
+                  </div>
                 )}
 
                 <p className="text-xs text-text-muted mt-2.5">
                   Використовуйте плейсхолдери у форматі <code className="text-accent-teal/70">{'{{ПІБ_Клієнта}}'}</code>,{' '}
                   <code className="text-accent-teal/70">{'{{Дата}}'}</code> для автозаповнення.
                 </p>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    openGoogleDrive();
-                    showToast('Google Drive відкрито. Завантажте файл, потім оберіть його з пристрою.');
-                  }}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-[14px] border border-border-default bg-bg-tertiary px-4 py-3 text-sm font-medium text-accent-teal transition hover:border-accent-teal/40 hover:bg-accent-teal/5 active:scale-[0.98]"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0">
-                    <path d="M4.433 22l-2.165-3.75L8.598 7.5h4.33L6.6 18.25z" fill="#0066DA"/>
-                    <path d="M14.17 22H9.84l3.03-5.25h8.66l-2.17 3.75z" fill="#00AC47"/>
-                    <path d="M7.268 7.5L5.1 3.75h8.66L15.93 7.5z" fill="#EA4335"/>
-                    <path d="M19.365 16.75h-8.66l2.17-3.75 4.33-7.5 2.165 3.75z" fill="#00832D"/>
-                    <path d="M15.928 7.5h-4.33l2.17 3.75z" fill="#2684FC"/>
-                    <path d="M8.598 7.5l-1.33 2.31L5.1 3.75h4.33z" fill="#FFBA00"/>
-                  </svg>
-                  Відкрити Google Drive
-                </button>
+                <p className="text-xs text-text-muted">
+                  "Сканувати" відкриває камеру пристрою, а знімок завантажується у той самий пайплайн документа.
+                </p>
               </div>
 
               <Button size="lg" className="w-full" loading={uploading} onClick={handleUploadTemplate}>
@@ -644,13 +668,37 @@ export function LawyerDocumentsPage() {
               ref={caseFileInputRef}
               type="file"
               accept="*/*"
-              onChange={(event) => setUploadCaseFile(event.target.files?.[0] ?? null)}
+              onChange={(event) => {
+                setUploadCaseFile(event.target.files?.[0] ?? null);
+                setShowCaseSourcePicker(false);
+              }}
+              className="hidden"
+            />
+            <input
+              ref={caseGalleryInputRef}
+              type="file"
+              accept="image/*"
+              onChange={(event) => {
+                setUploadCaseFile(event.target.files?.[0] ?? null);
+                setShowCaseSourcePicker(false);
+              }}
+              className="hidden"
+            />
+            <input
+              ref={caseCameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(event) => {
+                setUploadCaseFile(event.target.files?.[0] ?? null);
+                setShowCaseSourcePicker(false);
+              }}
               className="hidden"
             />
 
             {uploadCaseFile ? (
               <div className="flex items-center gap-3 rounded-[14px] border border-accent-teal/30 bg-accent-teal/5 px-4 py-3">
-                <FileText size={18} className="text-accent-teal" />
+                {uploadCaseFile.type.startsWith('image/') ? <FileImage size={18} className="text-accent-teal" /> : <FileText size={18} className="text-accent-teal" />}
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-text-primary truncate">{uploadCaseFile.name}</p>
                   <p className="text-xs text-text-muted">{(uploadCaseFile.size / 1024).toFixed(1)} KB</p>
@@ -660,6 +708,8 @@ export function LawyerDocumentsPage() {
                   onClick={() => {
                     setUploadCaseFile(null);
                     if (caseFileInputRef.current) caseFileInputRef.current.value = '';
+                    if (caseGalleryInputRef.current) caseGalleryInputRef.current.value = '';
+                    if (caseCameraInputRef.current) caseCameraInputRef.current.value = '';
                   }}
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-text-secondary hover:bg-accent-red/20 hover:text-accent-red transition"
                 >
@@ -667,9 +717,18 @@ export function LawyerDocumentsPage() {
                 </button>
               </div>
             ) : (
-              <Button size="lg" variant="secondary" className="w-full" onClick={() => caseFileInputRef.current?.click()}>
-                <FileUp size={18} /> Обрати файл
-              </Button>
+              <div className="space-y-2">
+                <Button size="lg" variant="secondary" className="w-full" onClick={() => setShowCaseSourcePicker((prev) => !prev)}>
+                  <FileUp size={18} /> Завантажити файл
+                </Button>
+                {showCaseSourcePicker ? (
+                  <div className="grid grid-cols-1 gap-2 rounded-[14px] border border-border-default bg-bg-tertiary/60 p-2">
+                    <button type="button" onClick={() => caseFileInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border-default bg-bg-tertiary px-3 py-2.5 text-sm text-text-secondary hover:border-accent-teal/40"><FolderOpen size={16} /> Файли</button>
+                    <button type="button" onClick={() => caseGalleryInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border-default bg-bg-tertiary px-3 py-2.5 text-sm text-text-secondary hover:border-accent-teal/40"><Images size={16} /> Галерея / Фото</button>
+                    <button type="button" onClick={() => caseCameraInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border-default bg-bg-tertiary px-3 py-2.5 text-sm text-accent-teal hover:border-accent-teal/40"><Camera size={16} /> Сканувати (камера)</button>
+                  </div>
+                ) : null}
+              </div>
             )}
 
             <Button size="lg" className="w-full" loading={uploadingToCase} onClick={handleUploadToCase}>

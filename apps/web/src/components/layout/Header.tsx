@@ -1,6 +1,6 @@
 import { Bell, LogOut, Scale, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { getBotSource } from '@/lib/telegram';
+import { resolveUiRole } from '@/lib/telegram';
 import { useNavigate } from 'react-router-dom';
 import { useLocation } from 'react-router-dom';
 
@@ -35,9 +35,7 @@ export function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const botSource = getBotSource();
-
-  const role = botSource === 'client' ? 'CLIENT' : (botSource === 'lawyer' || user?.role === 'LAWYER') ? 'LAWYER' : 'CLIENT';
+  const role = user ? resolveUiRole(user.role).role : 'CLIENT';
   const basePath = role === 'LAWYER' ? '/lawyer' : '/client';
   const title = resolveTitle(location.pathname, role);
   const roleLabel = role === 'LAWYER' ? 'PRO' : 'CLIENT';
