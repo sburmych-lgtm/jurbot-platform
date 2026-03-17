@@ -37,9 +37,14 @@ class ApiClient {
   }
 
   async request<T>(path: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+    const optionHeaders = (options.headers as Record<string, string> | undefined) ?? {};
+    const isFormDataBody = typeof FormData !== 'undefined' && options.body instanceof FormData;
+    const shouldSetJsonContentType = !isFormDataBody
+      && !Object.keys(optionHeaders).some((header) => header.toLowerCase() === 'content-type');
+
     const headers: Record<string, string> = this.buildAuthHeaders({
-      'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string> | undefined),
+      ...(shouldSetJsonContentType ? { 'Content-Type': 'application/json' } : {}),
+      ...optionHeaders,
     });
 
     const response = await fetch(`${API_BASE}${path}`, {
