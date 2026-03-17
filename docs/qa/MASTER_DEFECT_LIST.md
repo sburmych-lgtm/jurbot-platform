@@ -35,24 +35,32 @@ Severity:
 
 ## B-001 — Client booking shows "Invalid datetime"
 - Severity: `P0`
-- Status: `OPEN`
+- Status: `FIXED`
 - Area: Booking / datetime serialization / validation
 - Symptom:
   - In client booking flow, submitting a selected date/time produces `Invalid datetime`.
-- Likely causes to investigate:
-  - payload format mismatch,
-  - ISO vs local datetime mismatch,
-  - timezone handling,
-  - string concatenation bugs,
-  - backend parser expectations.
-- Acceptance criteria:
-  - client booking submission succeeds for valid date/time input,
-  - no generic `Invalid datetime` for valid user scenarios,
-  - invalid input, if any, shows explicit user-friendly validation.
-- Verification:
-  - automated test coverage for booking datetime formatting/parsing,
-  - full regression suite,
-  - manual client booking check.
+- Root cause:
+  - Booking payload contract relied on runtime `Date` parsing in the client and schema validation that did not explicitly enforce timezone-offset handling, so valid user selections could serialize inconsistently across clients and fail datetime validation.
+- Files changed:
+  - `apps/web/src/pages/client/BookingPage.tsx`
+  - `packages/shared/src/schemas/appointment.schema.ts`
+  - `tests/appointment-datetime-contract.test.ts`
+- Exact fix applied:
+  - Replaced `Date` constructor-based serialization in client booking submit flow with validated deterministic RFC3339 UTC payload construction (`YYYY-MM-DDTHH:mm:00.000Z`).
+  - Added strict date/time format guards before submit and preserved explicit user-facing validation toast for invalid input.
+  - Updated appointment create/update zod schema to require datetime with timezone offset (`datetime({ offset: true })`) to keep transport contract explicit and consistent.
+  - Extended datetime contract tests to verify offset-based ISO strings are accepted for both create and update payloads.
+- Tests added/updated:
+  - Updated `tests/appointment-datetime-contract.test.ts` to cover explicit timezone offsets for create/update payload validation.
+- Verification evidence:
+  - `npm run lint` ✅
+  - `npm run typecheck` ✅
+  - `npm run build` ✅
+  - `npm test` ✅
+- Regressions:
+  - None detected in full verification suite.
+- Residual limitations:
+  - End-to-end behavior in real Telegram mobile webview still requires device validation.
 
 ## B-002 — Client document upload still returns internal server error
 - Severity: `P0`

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const createAppointmentSchema = z.object({
   type: z.enum(['FREE', 'CONSULT', 'ANALYSIS']),
-  date: z.string().datetime(),
+  date: z.string().datetime({ offset: true }),
   lawyerId: z.string().uuid().optional(),
   clientId: z.string().uuid().optional(),
   caseId: z.string().uuid().optional(),
@@ -11,7 +11,7 @@ export const createAppointmentSchema = z.object({
 
 export const updateAppointmentSchema = z.object({
   status: z.enum(['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED']).optional(),
-  date: z.string().datetime().optional(),
+  date: z.string().datetime({ offset: true }).optional(),
   notes: z.string().optional(),
 });
 
