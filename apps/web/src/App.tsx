@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { RouteGuard } from '@/components/auth/RouteGuard';
 import { useAuth } from '@/lib/auth';
-import { isTelegramWebApp, getBotSource } from '@/lib/telegram';
+import { isTelegramWebApp, resolveUiRole, logModeResolution } from '@/lib/telegram';
 
 // Public pages
 import { LoginPage } from '@/pages/public/LoginPage';
@@ -45,8 +45,8 @@ function HomeRedirect() {
   if (!user) {
     // In Telegram: auth already resolved (loading=false) but user not found
     if (isTelegramWebApp()) {
-      const botSource = getBotSource();
-      const roleLabel = botSource === 'lawyer' ? 'адвокатського' : 'клієнтського';
+      const { role } = resolveUiRole(undefined);
+      const roleLabel = role === 'LAWYER' ? 'адвокатського' : 'клієнтського';
       return (
         <div className="min-h-screen px-6 py-10">
           <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-md items-center justify-center">
@@ -73,11 +73,10 @@ function HomeRedirect() {
     return <Navigate to="/login" replace />;
   }
 
-  // Bot source (from Telegram ?startapp= param) overrides DB role.
-  // This lets a LAWYER access client UI via @YurBotClientBot.
-  const botSource = getBotSource();
-  if (botSource === 'client') return <Navigate to="/client" replace />;
-  if (botSource === 'lawyer' || user.role === 'LAWYER') return <Navigate to="/lawyer" replace />;
+  const resolved = resolveUiRole(user.role);
+  logModeResolution({ reason: 'home_redirect', userRole: user.role });
+
+  if (resolved.role === 'LAWYER') return <Navigate to="/lawyer" replace />;
   return <Navigate to="/client" replace />;
 }
 

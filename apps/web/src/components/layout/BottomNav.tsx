@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { getBotSource } from '@/lib/telegram';
+import { resolveUiRole } from '@/lib/telegram';
 import {
   Briefcase,
   Calendar,
@@ -36,9 +36,8 @@ export function BottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const botSource = getBotSource();
-  const isLawyer = botSource === 'client' ? false : (botSource === 'lawyer' || user?.role === 'LAWYER');
-  const tabs = isLawyer ? LAWYER_TABS : CLIENT_TABS;
+  const resolvedRole = user ? resolveUiRole(user.role).role : 'CLIENT';
+  const tabs = resolvedRole === 'LAWYER' ? LAWYER_TABS : CLIENT_TABS;
 
   const isActive = (path: string) => {
     if (path === '/lawyer' || path === '/client') {

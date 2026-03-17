@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
-import { getBotSource } from '@/lib/telegram';
+import { resolveUiRole, logModeResolution } from '@/lib/telegram';
 import { Spinner } from '@/components/ui/Spinner';
 
 interface RouteGuardProps {
@@ -22,12 +22,12 @@ export function RouteGuard({ children, role }: RouteGuardProps) {
 
   if (!user) return <Navigate to="/login" replace />;
 
-  // Bot source overrides DB role — allows LAWYER to access client UI via client bot
   if (role) {
-    const botSource = getBotSource();
-    const effectiveRole = botSource === 'client' ? 'CLIENT' : botSource === 'lawyer' ? 'LAWYER' : user.role;
-    if (effectiveRole !== role) {
-      const redirect = effectiveRole === 'LAWYER' ? '/lawyer' : '/client';
+    const resolved = resolveUiRole(user.role);
+    logModeResolution({ reason: 'route_guard', pathname: window.location.pathname, userRole: user.role });
+
+    if (resolved.role !== role) {
+      const redirect = resolved.role === 'LAWYER' ? '/lawyer' : '/client';
       return <Navigate to={redirect} replace />;
     }
   }
