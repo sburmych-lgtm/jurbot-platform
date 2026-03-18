@@ -44,6 +44,13 @@ export async function markAllAsRead(userId: string) {
   });
 }
 
+/** B-050: Get count of unread notifications for a user */
+export async function getUnreadCount(userId: string): Promise<number> {
+  return prisma.notification.count({
+    where: { userId, isRead: false },
+  });
+}
+
 /** Create a notification (used by other services) */
 export async function createNotification(params: {
   userId: string;

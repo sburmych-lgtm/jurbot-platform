@@ -1,8 +1,10 @@
+import { useEffect, useState, useCallback } from 'react';
 import { Bell, LogOut, Scale, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { resolveUiRole } from '@/lib/telegram';
 import { useNavigate } from 'react-router-dom';
 import { useLocation } from 'react-router-dom';
+import { api } from '@/lib/api';
 
 const LAWYER_TITLES: Array<[string, string]> = [
   ['/lawyer/intake', 'Нові заявки'],
@@ -39,6 +41,23 @@ export function Header() {
   const basePath = role === 'LAWYER' ? '/lawyer' : '/client';
   const title = resolveTitle(location.pathname, role);
   const roleLabel = role === 'LAWYER' ? 'PRO' : 'CLIENT';
+
+  // B-050: Unread notification badge
+  const [unreadCount, setUnreadCount] = useState(0);
+  const fetchUnread = useCallback(async () => {
+    try {
+      const res = await api.get<{ count: number }>('/v1/notifications/unread-count');
+      setUnreadCount(res.data?.count ?? 0);
+    } catch {
+      // silent fail
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchUnread();
+    const interval = setInterval(() => { void fetchUnread(); }, 30_000);
+    return () => clearInterval(interval);
+  }, [fetchUnread]);
   const roleIcon = role === 'LAWYER' ? Scale : ShieldCheck;
   const RoleIcon = roleIcon;
   const accentClass =
@@ -73,10 +92,15 @@ export function Header() {
           <div className="flex items-center gap-1 sm:gap-2">
             <button
               onClick={() => navigate(`${basePath}/notifications`)}
-              className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-white/10 bg-white/5 text-text-secondary transition hover:border-white/20 hover:text-text-primary sm:h-11 sm:w-11 sm:rounded-[14px]"
+              className="relative flex h-8 w-8 items-center justify-center rounded-[10px] border border-white/10 bg-white/5 text-text-secondary transition hover:border-white/20 hover:text-text-primary sm:h-11 sm:w-11 sm:rounded-[14px]"
               aria-label="Сповіщення"
             >
               <Bell size={16} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white sm:h-5 sm:w-5 sm:text-[10px]">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </button>
             <button
               onClick={handleLogout}

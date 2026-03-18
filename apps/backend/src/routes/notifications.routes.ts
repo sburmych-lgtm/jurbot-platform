@@ -6,6 +6,16 @@ import * as notificationService from '../services/notification.service.js';
 
 export const notificationsRouter = Router();
 
+// GET /notifications/unread-count — B-050: unread badge count
+notificationsRouter.get('/unread-count', authenticate, async (req, res, next) => {
+  try {
+    const count = await notificationService.getUnreadCount(req.user!.id);
+    res.json({ success: true, data: { count } });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /notifications — Both roles (own notifications)
 notificationsRouter.get('/', authenticate, async (req, res, next) => {
   try {
