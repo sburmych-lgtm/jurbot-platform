@@ -44,8 +44,12 @@ enum Urgency {
 enum AppointmentStatus {
   PENDING
   CONFIRMED
+  AWAITING_CLIENT_RESPONSE
+  REJECTED
   CANCELLED
+  CANCELLED_BY_CLIENT
   COMPLETED
+  EXPIRED
 }
 
 enum AppointmentType {
@@ -386,6 +390,8 @@ model Appointment {
   duration  Int
   price     Int
   notes     String?
+  reason    String?
+  suggestedTime DateTime?
 
   lawyerId String
   lawyer   LawyerProfile @relation(fields: [lawyerId], references: [id], onDelete: Restrict)

@@ -3,6 +3,8 @@ import { z } from 'zod';
 import {
   createAppointmentSchema,
   updateAppointmentSchema,
+  rejectAppointmentSchema,
+  respondToSuggestionSchema,
 } from '@jurbot/shared';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
@@ -113,6 +115,63 @@ appointmentsRouter.post(
       );
 
       res.status(201).json({ success: true, data: appointment });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// POST /appointments/:id/confirm — LAWYER confirms pending appointment (B-030)
+appointmentsRouter.post(
+  '/:id/confirm',
+  authenticate,
+  requireRole('LAWYER'),
+  async (req, res, next) => {
+    try {
+      const appointment = await appointmentService.confirmAppointment(param(req, 'id'), req.user!.id);
+      res.json({ success: true, data: appointment });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// POST /appointments/:id/reject — LAWYER rejects pending appointment (B-030)
+appointmentsRouter.post(
+  '/:id/reject',
+  authenticate,
+  requireRole('LAWYER'),
+  validate(rejectAppointmentSchema),
+  async (req, res, next) => {
+    try {
+      const { reason, suggestedTime } = req.body;
+      const appointment = await appointmentService.rejectAppointment(
+        param(req, 'id'),
+        req.user!.id,
+        reason,
+        suggestedTime,
+      );
+      res.json({ success: true, data: appointment });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// POST /appointments/:id/respond — CLIENT responds to suggestion (B-031)
+appointmentsRouter.post(
+  '/:id/respond',
+  authenticate,
+  requireRole('CLIENT'),
+  validate(respondToSuggestionSchema),
+  async (req, res, next) => {
+    try {
+      const appointment = await appointmentService.respondToSuggestion(
+        param(req, 'id'),
+        req.user!.id,
+        req.body.accept,
+      );
+      res.json({ success: true, data: appointment });
     } catch (error) {
       next(error);
     }

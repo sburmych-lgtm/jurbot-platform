@@ -587,6 +587,158 @@ export async function getAvailableSlots(
   );
 }
 
+/** B-030: Lawyer confirms a pending appointment */
+export async function confirmAppointment(id: string, userId: string) {
+  const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
+  if (!profile) throw new AppError(403, 'Профіль адвоката не знайдено');
+
+  const appointment = await prisma.appointment.findFirst({
+    where: { id, lawyerId: profile.id, status: 'PENDING' },
+    include: { client: { include: { user: { select: { id: true, name: true } } } } },
+  });
+  if (!appointment) throw new AppError(404, 'Запис не знайдено або вже оброблено');
+
+  const updated = await prisma.appointment.update({
+    where: { id },
+    data: { status: 'CONFIRMED' as never },
+    include: {
+      client: { include: { user: { select: { id: true, name: true } } } },
+      lawyer: { include: { user: { select: { id: true, name: true } } } },
+    },
+  });
+
+  // Create case for this booking (B-040)
+  const { findOrCreateForBooking } = await import('./case.service.js');
+  await findOrCreateForBooking(profile.id, appointment.clientId, profile.orgId);
+
+  // Notify client
+  await prisma.notification.create({
+    data: {
+      userId: appointment.client.user.id,
+      type: 'APPOINTMENT_REMINDER' as never,
+      title: 'Запис підтверджено',
+      body: `Ваш запис на ${appointment.date.toLocaleDateString('uk-UA')} підтверджено адвокатом.`,
+    },
+  });
+
+  return updated;
+}
+
+/** B-030: Lawyer rejects a pending appointment */
+export async function rejectAppointment(
+  id: string,
+  userId: string,
+  reason: string,
+  suggestedTime?: string,
+) {
+  const profile = await prisma.lawyerProfile.findUnique({ where: { userId } });
+  if (!profile) throw new AppError(403, 'Профіль адвоката не знайдено');
+
+  const appointment = await prisma.appointment.findFirst({
+    where: { id, lawyerId: profile.id, status: 'PENDING' },
+    include: { client: { include: { user: { select: { id: true, name: true } } } } },
+  });
+  if (!appointment) throw new AppError(404, 'Запис не знайдено або вже оброблено');
+
+  const newStatus = reason === 'suggest_other_time' ? 'AWAITING_CLIENT_RESPONSE' : 'REJECTED';
+
+  const updated = await prisma.appointment.update({
+    where: { id },
+    data: {
+      status: newStatus as never,
+      reason,
+      ...(suggestedTime ? { suggestedTime: new Date(suggestedTime) } : {}),
+    },
+    include: {
+      client: { include: { user: { select: { id: true, name: true } } } },
+      lawyer: { include: { user: { select: { id: true, name: true } } } },
+    },
+  });
+
+  // Notify client based on reason
+  const notificationMessages: Record<string, { title: string; body: string }> = {
+    suggest_other_time: {
+      title: 'Адвокат пропонує інший час',
+      body: suggestedTime
+        ? `Адвокат пропонує перенести консультацію на ${new Date(suggestedTime).toLocaleString('uk-UA')}.`
+        : 'Адвокат просить обрати інший час для консультації.',
+    },
+    slot_unavailable: {
+      title: 'Обраний час недоступний',
+      body: 'Обраний вами час уже неактуальний. Будь ласка, оберіть іншу годину.',
+    },
+    decline_client: {
+      title: 'Адвокат не може прийняти запис',
+      body: 'На жаль, адвокат не може взятися за цю справу.',
+    },
+  };
+
+  const msg = notificationMessages[reason] ?? { title: 'Запис відхилено', body: 'Ваш запис було відхилено.' };
+
+  await prisma.notification.create({
+    data: {
+      userId: appointment.client.user.id,
+      type: 'APPOINTMENT_REMINDER' as never,
+      title: msg.title,
+      body: msg.body,
+    },
+  });
+
+  return updated;
+}
+
+/** B-031: Client responds to lawyer's suggested time */
+export async function respondToSuggestion(id: string, userId: string, accept: boolean) {
+  const profile = await prisma.clientProfile.findUnique({ where: { userId } });
+  if (!profile) throw new AppError(403, 'Профіль клієнта не знайдено');
+
+  const appointment = await prisma.appointment.findFirst({
+    where: { id, clientId: profile.id, status: 'AWAITING_CLIENT_RESPONSE' },
+    include: { lawyer: { select: { userId: true } } },
+  });
+  if (!appointment) throw new AppError(404, 'Запис не знайдено або не очікує відповіді');
+
+  if (accept && appointment.suggestedTime) {
+    const updated = await prisma.appointment.update({
+      where: { id },
+      data: {
+        status: 'CONFIRMED' as never,
+        date: appointment.suggestedTime,
+        suggestedTime: null,
+        reason: null,
+      },
+    });
+
+    await prisma.notification.create({
+      data: {
+        userId: appointment.lawyer.userId,
+        type: 'APPOINTMENT_REMINDER' as never,
+        title: 'Клієнт прийняв запропонований час',
+        body: `Консультацію перенесено на ${appointment.suggestedTime.toLocaleString('uk-UA')}.`,
+      },
+    });
+
+    return updated;
+  }
+
+  // Client declined — cancel the appointment
+  const updated = await prisma.appointment.update({
+    where: { id },
+    data: { status: 'CANCELLED_BY_CLIENT' as never },
+  });
+
+  await prisma.notification.create({
+    data: {
+      userId: appointment.lawyer.userId,
+      type: 'APPOINTMENT_REMINDER' as never,
+      title: 'Клієнт відхилив запропонований час',
+      body: 'Клієнт не прийняв запропонований час консультації.',
+    },
+  });
+
+  return updated;
+}
+
 /** Verify that a CLIENT user has access to a specific appointment */
 export async function verifyClientAccess(
   appointmentId: string,
