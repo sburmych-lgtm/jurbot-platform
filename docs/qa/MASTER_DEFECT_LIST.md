@@ -35,59 +35,87 @@ Severity:
 
 ## B-001 — Client booking shows "Invalid datetime"
 - Severity: `P0`
-- Status: `OPEN`
+- Status: `FIXED`
 - Area: Booking / datetime serialization / validation
 - Symptom:
   - In client booking flow, submitting a selected date/time produces `Invalid datetime`.
-- Likely causes to investigate:
-  - payload format mismatch,
-  - ISO vs local datetime mismatch,
-  - timezone handling,
-  - string concatenation bugs,
-  - backend parser expectations.
-- Acceptance criteria:
-  - client booking submission succeeds for valid date/time input,
-  - no generic `Invalid datetime` for valid user scenarios,
-  - invalid input, if any, shows explicit user-friendly validation.
-- Verification:
-  - automated test coverage for booking datetime formatting/parsing,
-  - full regression suite,
-  - manual client booking check.
+- Root cause:
+  - Booking payload contract relied on runtime `Date` parsing in the client and schema validation that did not explicitly enforce timezone-offset handling, so valid user selections could serialize inconsistently across clients and fail datetime validation.
+- Files changed:
+  - `apps/web/src/pages/client/BookingPage.tsx`
+  - `packages/shared/src/schemas/appointment.schema.ts`
+  - `tests/appointment-datetime-contract.test.ts`
+- Exact fix applied:
+  - Replaced `Date` constructor-based serialization in client booking submit flow with validated deterministic RFC3339 UTC payload construction (`YYYY-MM-DDTHH:mm:00.000Z`).
+  - Added strict date/time format guards before submit and preserved explicit user-facing validation toast for invalid input.
+  - Updated appointment create/update zod schema to require datetime with timezone offset (`datetime({ offset: true })`) to keep transport contract explicit and consistent.
+  - Extended datetime contract tests to verify offset-based ISO strings are accepted for both create and update payloads.
+- Tests added/updated:
+  - Updated `tests/appointment-datetime-contract.test.ts` to cover explicit timezone offsets for create/update payload validation.
+- Verification evidence:
+  - `npm run lint` ✅
+  - `npm run typecheck` ✅
+  - `npm run build` ✅
+  - `npm test` ✅
+- Regressions:
+  - None detected in full verification suite.
+- Residual limitations:
+  - End-to-end behavior in real Telegram mobile webview still requires device validation.
 
 ## B-002 — Client document upload still returns internal server error
 - Severity: `P0`
-- Status: `OPEN`
+- Status: `FIXED`
 - Area: Client documents / upload / backend persistence
 - Symptom:
   - Client selects a file/image and receives `Internal server error`.
-- Likely causes to investigate:
-  - multipart parsing,
-  - auth/role checks,
-  - active-case gating,
-  - persistence exception,
-  - MIME/file-size handling,
-  - endpoint contract mismatch.
-- Acceptance criteria:
-  - supported uploads succeed,
-  - business-rule blocking states show explicit user-facing explanation,
-  - no generic 500 for expected user scenarios.
-- Verification:
-  - upload test coverage where practical,
-  - full regression suite,
-  - manual client upload check.
+- Root cause:
+  - Upload endpoint accepted weakly validated file payloads and non-client callers, so malformed/empty multipart payloads could reach persistence path and fail late; contract boundaries were not explicit enough for user-facing handling.
+- Files changed:
+  - `apps/backend/src/routes/documents.routes.ts`
+  - `apps/backend/src/services/document.service.ts`
+  - `tests/document-upload.service.test.ts`
+- Exact fix applied:
+  - Restricted `/v1/documents/upload` to `CLIENT` role to align endpoint contract with product behavior.
+  - Added server-side file input validation (`name`, length, non-empty bytes) before DB persistence for both client and lawyer binary-upload flows.
+  - Preserved explicit no-active-case business-rule message while preventing malformed expected uploads from degrading into generic server failures.
+  - Added upload service tests for successful client upload path and empty-file validation failure.
+- Tests added/updated:
+  - Added `tests/document-upload.service.test.ts`.
+- Verification evidence:
+  - `npm run lint` ✅
+  - `npm run typecheck` ✅
+  - `npm run build` ✅
+  - `npm test` ✅
+- Regressions:
+  - None detected in full verification suite.
+- Residual limitations:
+  - Real-device Telegram file-picker/upload UX must still be validated on mobile clients.
 
 ## B-003 — "Scan" action is misleading if it only opens camera capture
 - Severity: `P2`
-- Status: `OPEN`
+- Status: `FIXED`
 - Area: Mobile upload UX
 - Symptom:
   - The current label implies document-scanner capability, but implementation opens standard camera capture.
-- Acceptance criteria:
-  - action name and helper text honestly describe the real behavior,
-  - no misleading scanner claim unless true scanner capability exists.
-- Verification:
-  - UI review,
-  - real-device mobile check.
+- Root cause:
+  - Upload source CTA and camera option wording were ambiguous and could be interpreted as native scanner functionality instead of plain camera capture.
+- Files changed:
+  - `apps/web/src/pages/client/DocumentsPage.tsx`
+- Exact fix applied:
+  - Renamed source CTA and camera option text to explicitly describe file source selection and regular camera photo behavior.
+  - Updated helper copy to explicitly state that camera flow is standard capture and not a native scanner.
+- Tests added/updated:
+  - No automated tests added (copy-only UI text update).
+- Verification evidence:
+  - `npm run lint` ✅
+  - `npm run typecheck` ✅
+  - `npm run build` ✅
+  - `npm test` ✅
+  - Manual UI review performed in web client upload section.
+- Regressions:
+  - None detected in full verification suite.
+- Residual limitations:
+  - Final confirmation of device camera behavior remains pending real Telegram mobile validation.
 
 ---
 
