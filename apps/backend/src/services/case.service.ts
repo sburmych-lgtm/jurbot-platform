@@ -145,6 +145,48 @@ export async function softDelete(id: string, userId: string) {
   });
 }
 
+/**
+ * B-040: Find or create a case when a booking is confirmed by the lawyer.
+ * Product rule: booking ≠ active case. Case activates AFTER lawyer confirms.
+ */
+export async function findOrCreateForBooking(
+  lawyerProfileId: string,
+  clientProfileId: string,
+  orgId: string | null,
+): Promise<{ id: string; caseNumber: string; isNew: boolean }> {
+  // Check for existing active case between this lawyer and client
+  const existing = await prisma.case.findFirst({
+    where: {
+      lawyerId: lawyerProfileId,
+      clientId: clientProfileId,
+      deletedAt: null,
+    },
+    select: { id: true, caseNumber: true },
+  });
+
+  if (existing) {
+    return { id: existing.id, caseNumber: existing.caseNumber, isNew: false };
+  }
+
+  // Create new case with INTAKE status (initial state after consultation confirmed)
+  const caseNumber = generateCaseNumber();
+  const newCase = await prisma.case.create({
+    data: {
+      caseNumber,
+      title: 'Нова консультація',
+      category: 'OTHER' as any,
+      urgency: 'NORMAL' as any,
+      status: 'INTAKE' as any,
+      lawyerId: lawyerProfileId,
+      clientId: clientProfileId,
+      orgId: orgId ?? undefined,
+    },
+    select: { id: true, caseNumber: true },
+  });
+
+  return { id: newCase.id, caseNumber: newCase.caseNumber, isNew: true };
+}
+
 /** Verify that a CLIENT user has access to a specific case */
 export async function verifyClientAccess(caseId: string, userId: string): Promise<void> {
   const profile = await prisma.clientProfile.findUnique({ where: { userId } });

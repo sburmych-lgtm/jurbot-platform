@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Briefcase } from 'lucide-react';
+import { Briefcase, Clock } from 'lucide-react';
 import { api } from '@/lib/api';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card } from '@/components/ui/Card';
@@ -29,23 +29,72 @@ const categoryLabels: Record<string, string> = {
   LABOR: 'Трудове', OTHER: 'Інше',
 };
 
+interface AppointmentItem {
+  id: string;
+  status: string;
+  date: string;
+}
+
 export function ClientCasePage() {
   const [caseData, setCaseData] = useState<CaseDetail | null>(null);
+  const [pendingBooking, setPendingBooking] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.get<CaseDetail[]>('/v1/cases');
-        const items = res.data ?? [];
-        if (items.length > 0) setCaseData(items[0] ?? null);
+        const [casesRes, appointmentsRes] = await Promise.all([
+          api.get<CaseDetail[]>('/v1/cases'),
+          api.get<AppointmentItem[]>('/v1/appointments'),
+        ]);
+        const items = casesRes.data ?? [];
+        if (items.length > 0) {
+          setCaseData(items[0] ?? null);
+        } else {
+          // B-041: Check if there's a pending/confirmed booking
+          const appointments = appointmentsRes.data ?? [];
+          const hasPending = appointments.some(
+            (a) => a.status === 'PENDING' || a.status === 'CONFIRMED',
+          );
+          setPendingBooking(hasPending);
+        }
       } catch {}
       setLoading(false);
     })();
   }, []);
 
   if (loading) return <Spinner />;
-  if (!caseData) return <EmptyState icon={Briefcase} title="Справу не знайдено" />;
+
+  // B-041: Show pre-case messaging instead of generic "not found"
+  if (!caseData) {
+    if (pendingBooking) {
+      return (
+        <PageContainer>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-accent-amber/15 rounded-full flex items-center justify-center">
+                <Clock size={24} className="text-accent-amber" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-text-primary">Очікується рішення адвоката</h1>
+                <p className="text-sm text-text-muted">Справа буде активована після підтвердження запису</p>
+              </div>
+            </div>
+            <Card>
+              <p className="text-sm text-text-secondary">
+                Ви маєте активний запис на консультацію. Після того, як адвокат підтвердить ваш запис,
+                справа буде створена автоматично і ви зможете відстежувати її прогрес тут.
+              </p>
+              <p className="text-sm text-text-muted mt-2">
+                Документи стануть доступні після підтвердження справи.
+              </p>
+            </Card>
+          </div>
+        </PageContainer>
+      );
+    }
+    return <EmptyState icon={Briefcase} title="Справу не знайдено" description="Запишіться на консультацію, щоб розпочати справу" />;
+  }
 
   return (
     <PageContainer>
