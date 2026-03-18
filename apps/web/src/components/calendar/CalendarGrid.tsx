@@ -8,9 +8,11 @@ const DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 interface CalendarGridProps {
   selected: string;
   onSelect: (dateStr: string) => void;
+  /** Set of date strings (YYYY-MM-DD) that should show a visual marker (e.g. dates with appointments) */
+  markedDates?: Set<string>;
 }
 
-export function CalendarGrid({ selected, onSelect }: CalendarGridProps) {
+export function CalendarGrid({ selected, onSelect, markedDates }: CalendarGridProps) {
   const [viewDate, setViewDate] = useState(new Date());
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -48,13 +50,14 @@ export function CalendarGrid({ selected, onSelect }: CalendarGridProps) {
           const isToday = fmtDate(date) === fmtDate(today);
           const isWeekend = date.getDay() === 0 || date.getDay() === 6;
           const isSel = selected === dateStr;
+          const hasMarker = markedDates?.has(dateStr) ?? false;
 
           return (
             <button
               key={i}
               disabled={isPast || isWeekend}
               onClick={() => onSelect(dateStr)}
-              className={`w-10 h-10 rounded-[10px] text-sm font-medium mx-auto flex items-center justify-center transition ${
+              className={`w-10 h-10 rounded-[10px] text-sm font-medium mx-auto flex flex-col items-center justify-center transition relative ${
                 isSel ? 'bg-accent-teal text-bg-primary font-bold'
                 : isPast || isWeekend ? 'text-text-muted/30 cursor-not-allowed'
                 : isToday ? 'bg-bg-elevated text-text-primary font-bold'
@@ -62,6 +65,9 @@ export function CalendarGrid({ selected, onSelect }: CalendarGridProps) {
               }`}
             >
               {day}
+              {hasMarker && (
+                <span className={`absolute bottom-1 w-1.5 h-1.5 rounded-full ${isSel ? 'bg-bg-primary' : 'bg-accent-teal'}`} />
+              )}
             </button>
           );
         })}

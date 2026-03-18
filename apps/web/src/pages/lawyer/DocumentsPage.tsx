@@ -479,7 +479,7 @@ export function LawyerDocumentsPage() {
                       <div className="grid grid-cols-1 gap-2 rounded-[14px] border border-border-default bg-bg-tertiary/60 p-2">
                         <button type="button" onClick={() => fileInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border-default bg-bg-tertiary px-3 py-2.5 text-sm text-text-secondary hover:border-accent-teal/40"><FolderOpen size={16} /> Файли</button>
                         <button type="button" onClick={() => galleryInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border-default bg-bg-tertiary px-3 py-2.5 text-sm text-text-secondary hover:border-accent-teal/40"><Images size={16} /> Галерея / Фото</button>
-                        <button type="button" onClick={() => cameraInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border-default bg-bg-tertiary px-3 py-2.5 text-sm text-accent-teal hover:border-accent-teal/40"><Camera size={16} /> Сканувати (камера)</button>
+                        <button type="button" onClick={() => cameraInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border-default bg-bg-tertiary px-3 py-2.5 text-sm text-accent-teal hover:border-accent-teal/40"><Camera size={16} /> Камера / фото документа</button>
                       </div>
                     ) : null}
                   </div>
@@ -490,7 +490,7 @@ export function LawyerDocumentsPage() {
                   <code className="text-accent-teal/70">{'{{Дата}}'}</code> для автозаповнення.
                 </p>
                 <p className="text-xs text-text-muted">
-                  "Сканувати" відкриває камеру пристрою, а знімок завантажується у той самий пайплайн документа.
+                  "Камера" відкриває камеру пристрою, а знімок завантажується у той самий пайплайн документа.
                 </p>
               </div>
 
@@ -725,7 +725,7 @@ export function LawyerDocumentsPage() {
                   <div className="grid grid-cols-1 gap-2 rounded-[14px] border border-border-default bg-bg-tertiary/60 p-2">
                     <button type="button" onClick={() => caseFileInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border-default bg-bg-tertiary px-3 py-2.5 text-sm text-text-secondary hover:border-accent-teal/40"><FolderOpen size={16} /> Файли</button>
                     <button type="button" onClick={() => caseGalleryInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border-default bg-bg-tertiary px-3 py-2.5 text-sm text-text-secondary hover:border-accent-teal/40"><Images size={16} /> Галерея / Фото</button>
-                    <button type="button" onClick={() => caseCameraInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border-default bg-bg-tertiary px-3 py-2.5 text-sm text-accent-teal hover:border-accent-teal/40"><Camera size={16} /> Сканувати (камера)</button>
+                    <button type="button" onClick={() => caseCameraInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border-default bg-bg-tertiary px-3 py-2.5 text-sm text-accent-teal hover:border-accent-teal/40"><Camera size={16} /> Камера / фото документа</button>
                   </div>
                 ) : null}
               </div>

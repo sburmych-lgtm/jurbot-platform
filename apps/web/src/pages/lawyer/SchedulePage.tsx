@@ -113,6 +113,17 @@ export function SchedulePage() {
     [appointments, selectedDate],
   );
 
+  // B-020: Build set of dates that have active appointments for calendar markers
+  const markedDates = useMemo(() => {
+    const dates = new Set<string>();
+    for (const item of appointments) {
+      if (item.status !== 'CANCELLED') {
+        dates.add(item.date.slice(0, 10));
+      }
+    }
+    return dates;
+  }, [appointments]);
+
   const configuredSet = useMemo(() => new Set(configuredSlots), [configuredSlots]);
   const bookedSet = useMemo(() => new Set(bookedSlots), [bookedSlots]);
 
@@ -152,7 +163,7 @@ export function SchedulePage() {
       <div className="space-y-4">
         <h1 className="text-xl font-bold text-text-primary">Розклад</h1>
 
-        <CalendarGrid selected={selectedDate} onSelect={setSelectedDate} />
+        <CalendarGrid selected={selectedDate} onSelect={setSelectedDate} markedDates={markedDates} />
 
         <Card>
           <div className="space-y-4">
