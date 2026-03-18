@@ -317,6 +317,11 @@ export async function create(
     throw new AppError(400, 'Некоректна дата запису');
   }
 
+  // B-001/B-010: Reject appointments in the past
+  if (appointmentDate.getTime() <= Date.now()) {
+    throw new AppError(400, 'Неможливо записатися на минулий час');
+  }
+
   const endDate = new Date(
     appointmentDate.getTime() + typeInfo.duration * 60 * 1000,
   );
@@ -467,6 +472,19 @@ export async function remove(id: string, userId: string, userRole: string) {
   });
 }
 
+/**
+ * Check if a slot time (HH:MM) is in the past for the current day.
+ * Uses UTC comparison — all slot times are treated as UTC.
+ */
+function isSlotInPast(slot: string, dateKey: string): boolean {
+  const now = new Date();
+  const todayKey = toDateKey(now);
+  if (dateKey !== todayKey) return false;
+
+  const slotDate = new Date(`${dateKey}T${slot}:00.000Z`);
+  return slotDate.getTime() <= now.getTime();
+}
+
 export async function getAvailability(
   date: string,
   context: AvailabilityContext,
@@ -502,8 +520,10 @@ export async function getAvailability(
   });
 
   const bookedSlots = buildBookedSlots(bookedAppointments);
+
+  // B-010: Filter out past slots for the current day
   const availableSlots = configuredSlots.filter(
-    (slot) => !bookedSlots.includes(slot),
+    (slot) => !bookedSlots.includes(slot) && !isSlotInPast(slot, dateKey),
   );
 
   return {

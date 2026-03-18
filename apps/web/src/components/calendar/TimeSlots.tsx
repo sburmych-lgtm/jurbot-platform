@@ -8,6 +8,15 @@ const SLOT_GROUPS = [
   },
 ] as const;
 
+/** Check if a slot is in the past for today (client-side safety filter) */
+function isSlotPastForToday(date: string, slot: string): boolean {
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  if (date !== todayStr) return false;
+  const slotDate = new Date(`${date}T${slot}:00.000Z`);
+  return slotDate.getTime() <= now.getTime();
+}
+
 interface TimeSlotsProps {
   date: string;
   selected: string;
@@ -33,7 +42,8 @@ export function TimeSlots({
         {slots.map((slot) => {
           const unavailableByConfig =
             availableSlots !== undefined && !availableSet.has(slot);
-          const busy = busySet.has(slot) || unavailableByConfig;
+          const pastSlot = isSlotPastForToday(date, slot);
+          const busy = busySet.has(slot) || unavailableByConfig || pastSlot;
           const active = selected === slot;
 
           return (
