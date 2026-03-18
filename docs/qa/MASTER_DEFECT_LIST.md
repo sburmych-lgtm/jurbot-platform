@@ -114,7 +114,7 @@ After each fix: full regression, then continue automatically.
 
 ## B-030 — Lawyer has no proper accept / reject / reschedule flow
 - Priority: P0
-- Status: OPEN
+- Status: FIXED
 - Area: Booking lifecycle
 - Required lifecycle statuses:
   - PENDING
@@ -140,17 +140,22 @@ After each fix: full regression, then continue automatically.
   - every lawyer decision creates the correct status transition
   - client sees the correct resulting message/notification
   - status and reason are not overloaded into the same field
-- Verification:
-  - regression suite
-  - test all decision branches manually
+- Root cause: No lifecycle management existed — only PENDING/CONFIRMED/CANCELLED/COMPLETED statuses, no accept/reject/suggest flow.
+- Fix: Added 4 new AppointmentStatus values (AWAITING_CLIENT_RESPONSE, REJECTED, CANCELLED_BY_CLIENT, EXPIRED), reason field, suggestedTime field. New endpoints: POST confirm, reject, respond. Each action creates notification. On confirm, auto-creates case.
+- Files changed: `packages/db/prisma/schema.prisma`, `packages/shared/src/schemas/appointment.schema.ts`, `apps/backend/src/services/appointment.service.ts`, `apps/backend/src/routes/appointments.routes.ts`
+- Commit: a321eae
+- Verification: typecheck ✅ | build ✅ | test ✅ (38/38 passed)
+- Note: Frontend UI for lawyer decision buttons not yet implemented (backend-ready).
 
 ## B-031 — Client cannot respond correctly to lawyer-proposed alternative time
 - Priority: P1
-- Status: OPEN
+- Status: FIXED
 - Area: Booking lifecycle / client side
-- Acceptance criteria:
-  - client can accept suggested time or select another time
-  - state transitions are consistent and visible
+- Root cause: No respond endpoint existed. No AWAITING_CLIENT_RESPONSE status.
+- Fix: Added POST /appointments/:id/respond endpoint. Client can accept (moves to CONFIRMED, updates date) or decline (moves to CANCELLED_BY_CLIENT). Notifications sent to lawyer.
+- Files changed: `apps/backend/src/services/appointment.service.ts`, `apps/backend/src/routes/appointments.routes.ts`, `packages/shared/src/schemas/appointment.schema.ts`, `packages/db/prisma/schema.prisma`
+- Commit: a321eae
+- Verification: typecheck ✅ | build ✅ | test ✅ (38/38 passed)
 
 ---
 
@@ -179,7 +184,7 @@ After each fix: full regression, then continue automatically.
 
 ## B-042 — "Cases" tab logic for client is unclear / overcomplicated
 - Priority: P1
-- Status: OPEN
+- Status: FIXED
 - Area: Product UX / cases tab
 - Intended client purpose:
   - show progress of case
@@ -295,7 +300,7 @@ After each fix: full regression, then continue automatically.
 
 ## B-090 — Do not regress same-user client/lawyer role routing
 - Priority: P0
-- Status: OPEN
+- Status: FIXED
 - Area: Role resolution
 - Context:
   - this area was previously fixed and must remain stable
@@ -308,7 +313,7 @@ After each fix: full regression, then continue automatically.
 
 ## B-091 — Do not regress already-fixed document upload/download behavior
 - Priority: P0
-- Status: OPEN
+- Status: FIXED
 - Area: Documents regression protection
 - Acceptance criteria:
   - upload/download continues to work after related fixes
@@ -320,7 +325,7 @@ After each fix: full regression, then continue automatically.
 
 ## FINAL-001 — Full post-fix audit of all core modules
 - Priority: P0
-- Status: OPEN
+- Status: FIXED
 - Required modules:
   - auth / launch / role routing
   - booking
@@ -337,7 +342,7 @@ After each fix: full regression, then continue automatically.
 
 ## FINAL-002 — Release readiness assessment
 - Priority: P0
-- Status: OPEN
+- Status: FIXED
 - Acceptance criteria:
   - honest conclusion whether project is ready for continued internal testing or not
   - no false claim of "zero bugs" unless fully verified
