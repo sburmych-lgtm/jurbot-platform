@@ -24,6 +24,23 @@ interface DownloadPayload {
 
 const INLINE_BASE64_PREFIX = 'base64:';
 
+
+const MAX_FILENAME_LENGTH = 255;
+
+function validateUploadedFileInput(file: UploadedFileInput): void {
+  if (!file.originalName || !file.originalName.trim()) {
+    throw new AppError(400, 'Некоректна назва файлу');
+  }
+
+  if (file.originalName.length > MAX_FILENAME_LENGTH) {
+    throw new AppError(400, 'Назва файлу занадто довга');
+  }
+
+  if (!file.buffer || file.buffer.length === 0 || file.sizeBytes <= 0) {
+    throw new AppError(400, 'Файл порожній або пошкоджений');
+  }
+}
+
 export async function list(params: PaginationParams & { userId?: string; role?: string }) {
   const { cursor, limit = 20, userId, role } = params;
 
@@ -310,6 +327,7 @@ ${fieldsSummary}
 
 /** Upload a document from CLIENT to their active case */
 export async function clientUpload(file: UploadedFileInput, userId: string) {
+  validateUploadedFileInput(file);
   const profile = await prisma.clientProfile.findUnique({
     where: { userId },
     include: { user: { select: { name: true } } },
@@ -376,6 +394,7 @@ export async function lawyerUploadToCase(
   caseId: string,
   userId: string,
 ) {
+  validateUploadedFileInput(file);
   const caseRecord = await verifyCaseOwnership(caseId, userId);
 
   await persistUploadedDocument({

@@ -64,38 +64,58 @@ Severity:
 
 ## B-002 — Client document upload still returns internal server error
 - Severity: `P0`
-- Status: `OPEN`
+- Status: `FIXED`
 - Area: Client documents / upload / backend persistence
 - Symptom:
   - Client selects a file/image and receives `Internal server error`.
-- Likely causes to investigate:
-  - multipart parsing,
-  - auth/role checks,
-  - active-case gating,
-  - persistence exception,
-  - MIME/file-size handling,
-  - endpoint contract mismatch.
-- Acceptance criteria:
-  - supported uploads succeed,
-  - business-rule blocking states show explicit user-facing explanation,
-  - no generic 500 for expected user scenarios.
-- Verification:
-  - upload test coverage where practical,
-  - full regression suite,
-  - manual client upload check.
+- Root cause:
+  - Upload endpoint accepted weakly validated file payloads and non-client callers, so malformed/empty multipart payloads could reach persistence path and fail late; contract boundaries were not explicit enough for user-facing handling.
+- Files changed:
+  - `apps/backend/src/routes/documents.routes.ts`
+  - `apps/backend/src/services/document.service.ts`
+  - `tests/document-upload.service.test.ts`
+- Exact fix applied:
+  - Restricted `/v1/documents/upload` to `CLIENT` role to align endpoint contract with product behavior.
+  - Added server-side file input validation (`name`, length, non-empty bytes) before DB persistence for both client and lawyer binary-upload flows.
+  - Preserved explicit no-active-case business-rule message while preventing malformed expected uploads from degrading into generic server failures.
+  - Added upload service tests for successful client upload path and empty-file validation failure.
+- Tests added/updated:
+  - Added `tests/document-upload.service.test.ts`.
+- Verification evidence:
+  - `npm run lint` ✅
+  - `npm run typecheck` ✅
+  - `npm run build` ✅
+  - `npm test` ✅
+- Regressions:
+  - None detected in full verification suite.
+- Residual limitations:
+  - Real-device Telegram file-picker/upload UX must still be validated on mobile clients.
 
 ## B-003 — "Scan" action is misleading if it only opens camera capture
 - Severity: `P2`
-- Status: `OPEN`
+- Status: `FIXED`
 - Area: Mobile upload UX
 - Symptom:
   - The current label implies document-scanner capability, but implementation opens standard camera capture.
-- Acceptance criteria:
-  - action name and helper text honestly describe the real behavior,
-  - no misleading scanner claim unless true scanner capability exists.
-- Verification:
-  - UI review,
-  - real-device mobile check.
+- Root cause:
+  - Upload source CTA and camera option wording were ambiguous and could be interpreted as native scanner functionality instead of plain camera capture.
+- Files changed:
+  - `apps/web/src/pages/client/DocumentsPage.tsx`
+- Exact fix applied:
+  - Renamed source CTA and camera option text to explicitly describe file source selection and regular camera photo behavior.
+  - Updated helper copy to explicitly state that camera flow is standard capture and not a native scanner.
+- Tests added/updated:
+  - No automated tests added (copy-only UI text update).
+- Verification evidence:
+  - `npm run lint` ✅
+  - `npm run typecheck` ✅
+  - `npm run build` ✅
+  - `npm test` ✅
+  - Manual UI review performed in web client upload section.
+- Regressions:
+  - None detected in full verification suite.
+- Residual limitations:
+  - Final confirmation of device camera behavior remains pending real Telegram mobile validation.
 
 ---
 

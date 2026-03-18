@@ -118,7 +118,7 @@ documentsRouter.patch('/:id', authenticate, requireRole('LAWYER'), validate(upda
 });
 
 // POST /documents/upload — CLIENT uploads a file to their active case
-documentsRouter.post('/upload', authenticate, withUpload('file'), async (req, res, next) => {
+documentsRouter.post('/upload', authenticate, requireRole('CLIENT'), withUpload('file'), async (req, res, next) => {
   try {
     if (!req.file) {
       throw new AppError(400, 'Файл не передано');

@@ -104,7 +104,7 @@ export function ClientDocumentsPage() {
 
         <Card>
           <div className="space-y-3">
-            <p className="text-sm font-medium text-text-secondary">Завантажити файл до справи</p>
+            <p className="text-sm font-medium text-text-secondary">Обрати джерело файлу до справи</p>
 
             <input
               ref={fileInputRef}
@@ -160,7 +160,7 @@ export function ClientDocumentsPage() {
                   className="flex w-full items-center justify-center gap-2 rounded-[14px] border border-dashed border-border-light bg-bg-tertiary px-4 py-3.5 text-sm font-medium text-text-secondary transition hover:border-accent-teal/50 hover:text-accent-teal active:scale-[0.98]"
                 >
                   <FileUp size={18} />
-                  Завантажити файл
+                  Обрати джерело файлу
                 </button>
 
                 {showSourcePicker ? (
@@ -177,20 +177,20 @@ export function ClientDocumentsPage() {
                       onClick={() => galleryInputRef.current?.click()}
                       className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border-default bg-bg-tertiary px-3 py-2.5 text-sm text-text-secondary hover:border-accent-teal/40"
                     >
-                      <Images size={16} /> Галерея / Фото
+                      <Images size={16} /> Галерея / фото
                     </button>
                     <button
                       type="button"
                       onClick={() => cameraInputRef.current?.click()}
                       className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border-default bg-bg-tertiary px-3 py-2.5 text-sm text-accent-teal hover:border-accent-teal/40"
                     >
-                      <Camera size={16} /> Камера / фото документа
+                      <Camera size={16} /> Камера (зробити фото)
                     </button>
                   </div>
                 ) : null}
 
                 <p className="text-xs text-text-muted">
-                  Кнопка відкриває камеру пристрою для фото документа (не нативний сканер).
+                  Кнопка відкриває стандартну камеру пристрою для фото документа (це не нативний сканер).
                 </p>
               </div>
             )}
