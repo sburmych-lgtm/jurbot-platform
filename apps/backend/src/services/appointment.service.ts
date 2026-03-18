@@ -74,6 +74,26 @@ function slotFromDate(value: Date): string {
   return value.toISOString().slice(11, 16);
 }
 
+
+function toSlotMinutes(slot: string): number {
+  const [hoursRaw, minutesRaw] = slot.split(':');
+  const hours = Number(hoursRaw ?? NaN);
+  const minutes = Number(minutesRaw ?? NaN);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return -1;
+  }
+  return hours * 60 + minutes;
+}
+
+function filterPastSlotsForDate(dateKey: string, slots: string[], now: Date = new Date()): string[] {
+  const nowDateKey = toDateKey(now);
+  if (dateKey != nowDateKey) {
+    return slots;
+  }
+
+  const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  return slots.filter((slot) => toSlotMinutes(slot) > nowMinutes);
+}
 function buildBookedSlots(
   items: Array<{ date: Date; duration: number }>,
 ): string[] {
@@ -502,8 +522,9 @@ export async function getAvailability(
   });
 
   const bookedSlots = buildBookedSlots(bookedAppointments);
-  const availableSlots = configuredSlots.filter(
-    (slot) => !bookedSlots.includes(slot),
+  const availableSlots = filterPastSlotsForDate(
+    dateKey,
+    configuredSlots.filter((slot) => !bookedSlots.includes(slot)),
   );
 
   return {

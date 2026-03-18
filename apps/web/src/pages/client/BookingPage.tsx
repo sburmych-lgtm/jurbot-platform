@@ -30,6 +30,28 @@ interface AppointmentItem {
   status: string;
 }
 
+
+function toMinutes(slot: string): number {
+  const [hoursRaw, minutesRaw] = slot.split(':');
+  const hours = Number(hoursRaw ?? NaN);
+  const minutes = Number(minutesRaw ?? NaN);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return -1;
+  }
+  return hours * 60 + minutes;
+}
+
+function filterPastSlots(date: string, slots: string[]): string[] {
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  if (date !== today) {
+    return slots;
+  }
+
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  return slots.filter((slot) => toMinutes(slot) > nowMinutes);
+}
+
 export function BookingPage() {
   const { showToast } = useToast();
 
@@ -75,7 +97,7 @@ export function BookingPage() {
         );
         if (cancelled) return;
 
-        setAvailableSlots(res.data?.availableSlots ?? []);
+        setAvailableSlots(filterPastSlots(selectedDate, res.data?.availableSlots ?? []));
         setBookingLawyerId(res.data?.lawyerId ?? '');
       } catch {
         if (!cancelled) {
@@ -102,14 +124,15 @@ export function BookingPage() {
 
     setLoading(true);
     try {
-      const localDateTime = new Date(`${selectedDate}T${selectedTime}:00`);
-      if (Number.isNaN(localDateTime.getTime())) {
+      const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(selectedDate);
+      const isValidTime = /^([01]\d|2[0-3]):(00|30)$/.test(selectedTime);
+      if (!isValidDate || !isValidTime) {
         showToast('Некоректні дата або час. Перевірте вибраний слот.');
         setLoading(false);
         return;
       }
 
-      const dateTime = localDateTime.toISOString();
+      const dateTime = `${selectedDate}T${selectedTime}:00.000Z`;
       const res = await api.post<CreatedAppointment>('/v1/appointments', {
         date: dateTime,
         type,

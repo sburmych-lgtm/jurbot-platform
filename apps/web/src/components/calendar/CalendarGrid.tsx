@@ -8,12 +8,15 @@ const DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 interface CalendarGridProps {
   selected: string;
   onSelect: (dateStr: string) => void;
+  highlightedDates?: string[];
 }
 
-export function CalendarGrid({ selected, onSelect }: CalendarGridProps) {
+export function CalendarGrid({ selected, onSelect, highlightedDates = [] }: CalendarGridProps) {
   const [viewDate, setViewDate] = useState(new Date());
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
+  const highlightedSet = new Set(highlightedDates);
 
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
@@ -48,20 +51,26 @@ export function CalendarGrid({ selected, onSelect }: CalendarGridProps) {
           const isToday = fmtDate(date) === fmtDate(today);
           const isWeekend = date.getDay() === 0 || date.getDay() === 6;
           const isSel = selected === dateStr;
+          const hasAppointments = highlightedSet.has(dateStr);
 
           return (
             <button
               key={i}
               disabled={isPast || isWeekend}
               onClick={() => onSelect(dateStr)}
-              className={`w-10 h-10 rounded-[10px] text-sm font-medium mx-auto flex items-center justify-center transition ${
+              className={`relative w-10 h-10 rounded-[10px] text-sm font-medium mx-auto flex items-center justify-center transition ${
                 isSel ? 'bg-accent-teal text-bg-primary font-bold'
                 : isPast || isWeekend ? 'text-text-muted/30 cursor-not-allowed'
+                : hasAppointments ? 'border border-accent-teal/60 text-text-primary bg-accent-teal/10 hover:border-accent-teal'
                 : isToday ? 'bg-bg-elevated text-text-primary font-bold'
                 : 'text-text-secondary hover:bg-bg-hover'
               }`}
+              aria-label={hasAppointments ? `${day}, є записи` : String(day)}
             >
               {day}
+              {hasAppointments && !isSel ? (
+                <span className="absolute bottom-1 h-1.5 w-1.5 rounded-full bg-accent-teal" />
+              ) : null}
             </button>
           );
         })}

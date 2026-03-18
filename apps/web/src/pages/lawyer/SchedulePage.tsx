@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Calendar, Save } from 'lucide-react';
 import { api } from '@/lib/api';
 import { fmtDate } from '@/lib/utils';
+import { buildHighlightedBookingDates } from '@/lib/appointments';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { CalendarGrid } from '@/components/calendar/CalendarGrid';
 import { Card } from '@/components/ui/Card';
@@ -113,6 +114,11 @@ export function SchedulePage() {
     [appointments, selectedDate],
   );
 
+  const highlightedDates = useMemo(
+    () => buildHighlightedBookingDates(appointments),
+    [appointments],
+  );
+
   const configuredSet = useMemo(() => new Set(configuredSlots), [configuredSlots]);
   const bookedSet = useMemo(() => new Set(bookedSlots), [bookedSlots]);
 
@@ -152,7 +158,11 @@ export function SchedulePage() {
       <div className="space-y-4">
         <h1 className="text-xl font-bold text-text-primary">Розклад</h1>
 
-        <CalendarGrid selected={selectedDate} onSelect={setSelectedDate} />
+        <CalendarGrid
+          selected={selectedDate}
+          onSelect={setSelectedDate}
+          highlightedDates={highlightedDates}
+        />
 
         <Card>
           <div className="space-y-4">

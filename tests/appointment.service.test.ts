@@ -153,6 +153,36 @@ describe('appointment service', () => {
     ).rejects.toThrow('Цей час вже зайнятий');
   });
 
+
+  it('filters past same-day slots in availability response', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-15T10:15:00.000Z'));
+
+    try {
+      const { getAvailability } = await importService();
+
+      mockPrisma.lawyerProfile.findUnique.mockResolvedValue({
+        id: 'lp-1',
+        userId: 'lu-1',
+        orgId: 'org-1',
+      });
+      mockPrisma.lawyerAvailability.findUnique.mockResolvedValue({
+        slots: ['10:00', '10:30', '14:00'],
+      });
+      mockPrisma.appointment.findMany.mockResolvedValue([]);
+
+      const result = await getAvailability('2026-04-15', {
+        userId: 'lu-1',
+        role: 'LAWYER',
+      });
+
+      expect(result.configuredSlots).toEqual(['10:00', '10:30', '14:00']);
+      expect(result.availableSlots).toEqual(['10:30', '14:00']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('setAvailability upserts lawyer slots', async () => {
     const { setAvailability } = await importService();
 
