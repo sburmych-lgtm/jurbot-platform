@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Check } from 'lucide-react';
+import { ChevronLeft, Clock } from 'lucide-react';
 import { APPOINTMENT_TYPES } from '@jurbot/shared';
 import { api } from '@/lib/api';
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -100,6 +100,19 @@ export function BookingPage() {
       return;
     }
 
+    if (loading) return;
+
+    // Prevent duplicate submit if a pending appointment already exists for same date/time
+    const pendingDuplicate = appointments.find(
+      (item) =>
+        item.status === 'PENDING' &&
+        item.date.startsWith(`${selectedDate}T${selectedTime}`),
+    );
+    if (pendingDuplicate) {
+      showToast('Запит на цей час вже надіслано. Очікуйте підтвердження адвоката.');
+      return;
+    }
+
     setLoading(true);
     try {
       const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(selectedDate);
@@ -155,13 +168,16 @@ export function BookingPage() {
     return (
       <PageContainer>
         <div className="space-y-6 text-center py-8">
-          <div className="w-16 h-16 bg-accent-green/15 rounded-full flex items-center justify-center mx-auto">
-            <Check size={32} className="text-accent-green" />
+          <div className="w-16 h-16 bg-accent-teal/15 rounded-full flex items-center justify-center mx-auto">
+            <Clock size={32} className="text-accent-teal" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-text-primary">Запис підтверджено!</h1>
+            <h1 className="text-xl font-bold text-text-primary">Запит надіслано</h1>
             <p className="text-text-muted text-sm mt-1">
-              Ваш номер: <span className="font-mono text-accent-teal">{refNumber}</span>
+              Очікується підтвердження адвоката
+            </p>
+            <p className="text-text-muted text-xs mt-1">
+              Номер запису: <span className="font-mono text-accent-teal">{refNumber}</span>
             </p>
           </div>
           <Card>
@@ -279,7 +295,7 @@ export function BookingPage() {
             </Card>
 
             <Button size="lg" className="w-full" loading={loading} onClick={handleBook}>
-              Підтвердити запис
+              Записатися
             </Button>
           </div>
         )}
@@ -292,7 +308,24 @@ export function BookingPage() {
             <div className="space-y-2">
               {appointments.slice(0, 3).map((item) => (
                 <div key={item.id} className="rounded-[12px] border border-border-default p-3">
-                  <p className="text-sm text-text-primary font-medium">#{item.refNumber}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-text-primary font-medium">#{item.refNumber}</p>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        item.status === 'CONFIRMED'
+                          ? 'bg-accent-green/15 text-accent-green'
+                          : item.status === 'PENDING'
+                            ? 'bg-accent-teal/15 text-accent-teal'
+                            : 'bg-bg-tertiary text-text-muted'
+                      }`}
+                    >
+                      {item.status === 'CONFIRMED'
+                        ? 'Підтверджено'
+                        : item.status === 'PENDING'
+                          ? 'Очікує підтвердження'
+                          : item.status}
+                    </span>
+                  </div>
                   <p className="text-xs text-text-muted mt-1">
                     {new Date(item.date).toLocaleString('uk-UA')}
                   </p>
