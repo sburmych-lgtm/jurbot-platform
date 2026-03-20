@@ -53,9 +53,17 @@ class ApiClient {
       credentials: 'include',
     });
 
-    const json = (await response.json()) as ApiResponse<T>;
+    let json: ApiResponse<T>;
+    try {
+      json = (await response.json()) as ApiResponse<T>;
+    } catch {
+      if (!response.ok) {
+        throw new Error(`Помилка сервера (${response.status})`);
+      }
+      throw new Error('Некоректна відповідь сервера');
+    }
     if (!response.ok) {
-      throw new Error(json.error ?? 'Помилка сервера');
+      throw new Error(json.error ?? `Помилка сервера (${response.status})`);
     }
 
     return json;

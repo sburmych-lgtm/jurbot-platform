@@ -462,8 +462,13 @@ export async function remove(id: string, userId: string, userRole: string) {
     throw new AppError(404, 'Запис не знайдено');
   }
 
-  if (existing.status === 'CANCELLED') {
+  const cancelledStatuses = ['CANCELLED', 'CANCELLED_BY_CLIENT'];
+  if (cancelledStatuses.includes(existing.status)) {
     throw new AppError(400, 'Запис вже скасовано');
+  }
+
+  if (existing.status === 'REJECTED') {
+    throw new AppError(400, 'Запис вже відхилено');
   }
 
   await prisma.appointment.update({

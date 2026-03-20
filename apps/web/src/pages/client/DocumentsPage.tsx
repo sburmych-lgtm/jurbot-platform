@@ -45,7 +45,13 @@ export function ClientDocumentsPage() {
     })();
   }, []);
 
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
   const handleFileSelected = (file: File | null) => {
+    if (file && file.size > MAX_FILE_SIZE) {
+      showToast(`Файл завеликий. Максимальний розмір: ${MAX_FILE_SIZE / 1024 / 1024} МБ`);
+      return;
+    }
     setSelectedFile(file);
     setShowSourcePicker(false);
   };
@@ -72,6 +78,10 @@ export function ClientDocumentsPage() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Помилка при завантаженні файлу';
       showToast(message);
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
       console.error('[ClientDocumentsPage] Upload failed', err);
     }
     setUploading(false);

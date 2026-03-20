@@ -49,7 +49,8 @@ export function BookingPage() {
   const fetchAppointments = async () => {
     try {
       const res = await api.get<AppointmentItem[]>('/v1/appointments');
-      setAppointments((res.data ?? []).filter((item) => item.status !== 'CANCELLED'));
+      const hiddenStatuses = ['CANCELLED', 'CANCELLED_BY_CLIENT', 'EXPIRED'];
+      setAppointments((res.data ?? []).filter((item) => !hiddenStatuses.includes(item.status)));
     } catch (error) {
       console.error('[BookingPage] Failed to fetch appointments', error);
     }
@@ -152,7 +153,11 @@ export function BookingPage() {
     setBookingLawyerId('');
   };
 
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
   const cancelAppointment = async (appointmentId: string) => {
+    if (cancellingId) return;
+    setCancellingId(appointmentId);
     try {
       await api.delete(`/v1/appointments/${appointmentId}`);
       showToast('Запис скасовано');
@@ -162,6 +167,7 @@ export function BookingPage() {
       showToast(message);
       console.error('[BookingPage] Failed to cancel appointment', err);
     }
+    setCancellingId(null);
   };
 
   if (step === 4) {
@@ -316,27 +322,38 @@ export function BookingPage() {
                           ? 'bg-accent-green/15 text-accent-green'
                           : item.status === 'PENDING'
                             ? 'bg-accent-teal/15 text-accent-teal'
-                            : 'bg-bg-tertiary text-text-muted'
+                            : item.status === 'REJECTED'
+                              ? 'bg-accent-red/15 text-accent-red'
+                              : item.status === 'AWAITING_CLIENT_RESPONSE'
+                                ? 'bg-accent-amber/15 text-accent-amber'
+                                : 'bg-bg-tertiary text-text-muted'
                       }`}
                     >
                       {item.status === 'CONFIRMED'
                         ? 'Підтверджено'
                         : item.status === 'PENDING'
                           ? 'Очікує підтвердження'
-                          : item.status}
+                          : item.status === 'REJECTED'
+                            ? 'Відхилено'
+                            : item.status === 'AWAITING_CLIENT_RESPONSE'
+                              ? 'Потребує відповіді'
+                              : item.status}
                     </span>
                   </div>
                   <p className="text-xs text-text-muted mt-1">
                     {new Date(item.date).toLocaleString('uk-UA')}
                   </p>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="mt-2"
-                    onClick={() => { void cancelAppointment(item.id); }}
-                  >
-                    Скасувати
-                  </Button>
+                  {(item.status === 'PENDING' || item.status === 'CONFIRMED') && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="mt-2"
+                      loading={cancellingId === item.id}
+                      onClick={() => { void cancelAppointment(item.id); }}
+                    >
+                      Скасувати
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
