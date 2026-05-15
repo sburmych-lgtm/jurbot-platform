@@ -471,9 +471,11 @@ export async function remove(id: string, userId: string, userRole: string) {
     throw new AppError(400, 'Запис вже відхилено');
   }
 
+  const cancelledStatus = userRole === 'CLIENT' ? 'CANCELLED_BY_CLIENT' : 'CANCELLED';
+
   await prisma.appointment.update({
     where: { id },
-    data: { status: 'CANCELLED' as never },
+    data: { status: cancelledStatus as never },
   });
 }
 
@@ -702,6 +704,10 @@ export async function respondToSuggestion(id: string, userId: string, accept: bo
     include: { lawyer: { select: { userId: true } } },
   });
   if (!appointment) throw new AppError(404, 'Запис не знайдено або не очікує відповіді');
+
+  if (accept && !appointment.suggestedTime) {
+    throw new AppError(400, 'Адвокат не запропонував конкретний час — оберіть інший слот самостійно');
+  }
 
   if (accept && appointment.suggestedTime) {
     const updated = await prisma.appointment.update({

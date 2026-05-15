@@ -203,7 +203,7 @@ describe('appointment service', () => {
       status: 'PENDING',
       clientId: 'cp-1',
     });
-    mockPrisma.appointment.update.mockResolvedValue({ id: 'a-1', status: 'CANCELLED' });
+    mockPrisma.appointment.update.mockResolvedValue({ id: 'a-1', status: 'CANCELLED_BY_CLIENT' });
 
     await remove('a-1', 'cu-1', 'CLIENT');
 
@@ -212,7 +212,7 @@ describe('appointment service', () => {
     });
     expect(mockPrisma.appointment.update).toHaveBeenCalledWith({
       where: { id: 'a-1' },
-      data: { status: 'CANCELLED' },
+      data: { status: 'CANCELLED_BY_CLIENT' },
     });
   });
 });
