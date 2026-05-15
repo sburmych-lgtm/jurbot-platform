@@ -11,6 +11,7 @@ export interface UserPayload {
   role: string;
   name: string;
   isSuperadmin?: boolean;
+  botType?: 'lawyer' | 'client';
 }
 
 export interface TokenPair {

@@ -85,13 +85,16 @@ export async function telegramAuth(req: Request, _res: Response, next: NextFunct
     return;
   }
 
-  // Try lawyer bot token first, then client bot token
+  // Try lawyer bot token first, then client bot token, and remember which
+  // token validated initData — this tells us which Mini App opened the request.
   let parsed = validateInitData(initDataStr, config.telegramLawyerToken);
+  let botType: 'lawyer' | 'client' | null = parsed ? 'lawyer' : null;
   if (!parsed) {
     parsed = validateInitData(initDataStr, config.telegramClientToken);
+    if (parsed) botType = 'client';
   }
 
-  if (!parsed) {
+  if (!parsed || !botType) {
     throw new AppError(401, 'Недійсні дані Telegram авторизації');
   }
 
@@ -119,12 +122,18 @@ export async function telegramAuth(req: Request, _res: Response, next: NextFunct
     throw new AppError(401, 'Користувач не знайдений. Пройдіть реєстрацію через бота.');
   }
 
+  // Effective role: the bot that opened the Mini App wins over the stored role.
+  // This lets a user with LawyerProfile (e.g. SUPERADMIN) use @YurBotClientBot
+  // as a client without seeing the lawyer UI / hitting "clientId required".
+  const effectiveRole = botType === 'client' ? 'CLIENT' : 'LAWYER';
+
   req.user = {
     id: user.id,
     email: user.email ?? '',
-    role: user.role,
+    role: effectiveRole,
     name: user.name,
     isSuperadmin: superadmin,
+    botType,
   };
 
   next();

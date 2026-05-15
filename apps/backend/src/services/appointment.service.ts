@@ -98,6 +98,54 @@ function overlaps(
   return startA < endB && endA > startB;
 }
 
+function generateAccessCode(): string {
+  // 6-digit numeric code, padded with leading zeros
+  return Math.floor(Math.random() * 1_000_000).toString().padStart(6, '0');
+}
+
+/**
+ * Provision a ClientProfile for a user that currently only has a LawyerProfile.
+ * Typical scenario: SUPERADMIN testing the client bot — they need a profile to
+ * book appointments, but no invite-token flow has been completed.
+ *
+ * The profile is linked to the same organisation as the lawyer (so subsequent
+ * appointment / availability lookups can resolve back to a lawyer).
+ */
+async function ensureClientProfileForLawyer(
+  userId: string,
+  lawyer: { id: string; orgId: string | null },
+) {
+  // Find a usable invite token from this lawyer so the new client profile has
+  // a valid sourceToken for downstream resolveLawyerProfileForContext flows.
+  const inviteToken = await prisma.inviteToken.findFirst({
+    where: { lawyerId: lawyer.id, isActive: true, tokenType: 'PUBLIC_LAWYER' },
+    select: { id: true },
+  });
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      return await prisma.clientProfile.create({
+        data: {
+          userId,
+          orgId: lawyer.orgId,
+          accessCode: generateAccessCode(),
+          sourceTokenId: inviteToken?.id ?? null,
+        },
+      });
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      if (code !== 'P2002') throw err;
+      // Unique constraint hit — most likely on accessCode collision or another
+      // concurrent request already created the profile. Retry / read existing.
+      const existing = await prisma.clientProfile.findUnique({
+        where: { userId },
+      });
+      if (existing) return existing;
+    }
+  }
+  throw new AppError(500, 'Не вдалося ініціалізувати профіль клієнта');
+}
+
 async function resolveLawyerProfileForContext(
   context: AvailabilityContext,
 ): Promise<{ id: string; userId: string; orgId: string | null }> {
@@ -135,7 +183,21 @@ async function resolveLawyerProfileForContext(
       include: { sourceToken: true },
     });
     if (!clientProfile) {
-      throw new AppError(400, 'Профіль клієнта не знайдено');
+      // Self-service fallback: user has a LawyerProfile but is testing the
+      // client bot (typically SUPERADMIN). Spin up a ClientProfile linked to
+      // their own LawyerProfile so booking works without needing an invite.
+      const ownLawyer = await prisma.lawyerProfile.findUnique({
+        where: { userId },
+        select: { id: true, userId: true, orgId: true },
+      });
+      if (ownLawyer) {
+        await ensureClientProfileForLawyer(userId, ownLawyer);
+        return ownLawyer;
+      }
+      throw new AppError(
+        400,
+        'Профіль клієнта не знайдено. Зверніться до адвоката за інвайт-посиланням.',
+      );
     }
 
     if (clientProfile.sourceToken?.lawyerId) {
@@ -296,9 +358,23 @@ export async function create(
   // Bug 7 fix: CLIENT role always uses own profile, ignore payload clientId
   let clientId = input.clientId;
   if (userRole === 'CLIENT') {
-    const profile = await prisma.clientProfile.findUnique({ where: { userId } });
+    const existingProfile = await prisma.clientProfile.findUnique({ where: { userId } });
+    let profile = existingProfile;
     if (!profile) {
-      throw new AppError(400, 'Профіль клієнта не знайдено');
+      // Self-service fallback for users that only have a LawyerProfile
+      // (typically SUPERADMIN testing the client flow).
+      const ownLawyer = await prisma.lawyerProfile.findUnique({
+        where: { userId },
+        select: { id: true, userId: true, orgId: true },
+      });
+      if (ownLawyer) {
+        profile = await ensureClientProfileForLawyer(userId, ownLawyer);
+      } else {
+        throw new AppError(
+          400,
+          'Профіль клієнта не знайдено. Зверніться до адвоката за інвайт-посиланням.',
+        );
+      }
     }
     clientId = profile.id;
   }
