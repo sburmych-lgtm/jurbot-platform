@@ -53,10 +53,10 @@ describe('appointment service', () => {
       slots: ['09:00', '10:00', '14:00'],
     });
     mockPrisma.appointment.findMany.mockResolvedValue([
-      { date: new Date('2026-04-15T10:00:00.000Z'), duration: 30 },
+      { date: new Date('2027-04-15T10:00:00.000Z'), duration: 30 },
     ]);
 
-    const result = await getAvailability('2026-04-15', {
+    const result = await getAvailability('2027-04-15', {
       userId: 'lu-1',
       role: 'LAWYER',
     });
@@ -64,7 +64,7 @@ describe('appointment service', () => {
     expect(result.configuredSlots).toEqual(['09:00', '10:00', '14:00']);
     expect(result.bookedSlots).toEqual(['10:00']);
     expect(result.availableSlots).toEqual(['09:00', '14:00']);
-    expect(result.date).toBe('2026-04-15');
+    expect(result.date).toBe('2027-04-15');
   });
 
   it('getAvailability uses default slots when none configured', async () => {
@@ -107,7 +107,7 @@ describe('appointment service', () => {
     mockPrisma.lawyerAvailability.findUnique.mockResolvedValue(null);
     mockPrisma.appointment.findMany.mockResolvedValue([]);
 
-    const result = await getAvailability('2026-04-15', {
+    const result = await getAvailability('2027-04-15', {
       userId: 'cu-1',
       role: 'CLIENT',
     });
@@ -137,14 +137,14 @@ describe('appointment service', () => {
     });
     // Existing appointment at 10:00 — conflict
     mockPrisma.appointment.findMany.mockResolvedValue([
-      { date: new Date('2026-04-15T10:00:00.000Z'), duration: 30 },
+      { date: new Date('2027-04-15T10:00:00.000Z'), duration: 30 },
     ]);
 
     await expect(
       create(
         {
           type: 'FREE',
-          date: '2026-04-15T10:00:00.000Z',
+          date: '2027-04-15T10:00:00.000Z',
           notes: 'test',
         },
         'cu-1',
@@ -163,7 +163,7 @@ describe('appointment service', () => {
     });
     mockPrisma.lawyerAvailability.upsert.mockResolvedValue({
       lawyerId: 'lp-1',
-      date: new Date('2026-04-15T00:00:00.000Z'),
+      date: new Date('2027-04-15T00:00:00.000Z'),
       slots: ['09:00', '10:00', '14:00'],
     });
     // For the subsequent getAvailability call
@@ -173,7 +173,7 @@ describe('appointment service', () => {
     mockPrisma.appointment.findMany.mockResolvedValue([]);
 
     const result = await setAvailability(
-      '2026-04-15',
+      '2027-04-15',
       ['09:00', '10:00', '14:00'],
       'lu-1',
     );
@@ -183,7 +183,7 @@ describe('appointment service', () => {
         where: {
           lawyerId_date: {
             lawyerId: 'lp-1',
-            date: new Date('2026-04-15T00:00:00.000Z'),
+            date: new Date('2027-04-15T00:00:00.000Z'),
           },
         },
       }),

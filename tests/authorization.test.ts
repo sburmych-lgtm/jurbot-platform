@@ -232,13 +232,13 @@ describe('Bug 7: appointments - client impersonation', () => {
     mockPrisma.appointment.findMany.mockResolvedValue([]);
     mockPrisma.appointment.create.mockResolvedValue({
       id: 'apt-new', clientId: 'cp-real', refNumber: 'BK-2026-0001',
-      date: new Date('2026-04-15T09:00:00.000Z'), type: 'FREE',
+      date: new Date('2027-04-15T09:00:00.000Z'), type: 'FREE',
       client: { user: { name: 'Test', email: 'test@test.com', id: 'cu-1' } },
       lawyer: { userId: 'user-a', orgId: 'org-1', user: { id: 'user-a', name: 'Lawyer' } },
     });
 
     const result = await create(
-      { type: 'FREE', date: '2026-04-15T09:00:00.000Z', clientId: 'cp-impostor' },
+      { type: 'FREE', date: '2027-04-15T09:00:00.000Z', clientId: 'cp-impostor' },
       'cu-1',
       'CLIENT',
     );
